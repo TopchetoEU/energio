@@ -20,7 +20,7 @@ export class serverGame {
                     newDirection: v.direction,
                 });
             });
-            (v as serverPlayer).syncPos();
+            (v as serverPlayer).sync();
         });
     }
 
