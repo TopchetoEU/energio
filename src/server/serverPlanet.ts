@@ -11,15 +11,22 @@ export class serverPlanet extends planet {
         if (typeof this._ownerId !== 'undefined') return this.game.getPlayer(this._ownerId);
         else return null;
     }
+    public get energyBalance() {
+        return this.productionPerCapita * this.peopleCount - this.consumption;
+    }
 
     public update(delta: number) {
         if (typeof this._ownerId !== 'undefined') {
-            this._peopleCount *= GROWTH_RATE;
+            this._peopleCount *= Math.pow(GROWTH_RATE, 1 / delta);
+            this._peopleCount = Math.round(this._peopleCount);
             if (this._peopleCount > this.limit) this._peopleCount = this.limit;
+        }
+        else {
+            this._peopleCount = 0;
         }
     }
 
-    constructor(limit: number, location: vector, private game: serverGame) {
-        super(limit, location, ++nextId);
+    constructor(consumption: number, prodPerCapita: number, limit: number, location: vector, private game: serverGame) {
+        super(++nextId, consumption, prodPerCapita, limit, location);
     }
 }

@@ -5,8 +5,8 @@ export abstract class planet {
     protected _location: vector;
     protected _ownerId?: number;
     protected _peopleCount: number = 0;
-    public readonly id: number;
-    public readonly limit: number;
+
+    public abstract get energyBalance(): number;
 
     public get location(): vector {
         return this._location;
@@ -16,9 +16,13 @@ export abstract class planet {
     }
     public abstract get owner(): player | null;
 
-    public constructor(limit: number, initLocation: vector, id: number) {
-        this.id = id;
-        this.limit = limit;
+    public constructor(
+        public readonly id: number,
+        public readonly consumption: number,
+        public readonly productionPerCapita: number,
+        public readonly limit: number,
+        initLocation: vector
+    ) {
         this._location = initLocation;
     }
 }

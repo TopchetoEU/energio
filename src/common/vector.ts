@@ -1,8 +1,13 @@
 export const EPSILON = 0.0001;
 
-function numEquals(a: number, b: number) {
-    const diff = a - b;
-    return diff > -EPSILON && diff < EPSILON;
+export const ExtMath = {
+    drag(drag: number, delta: number) {
+        return Math.pow(1 + drag, delta);
+    },
+    numEquals(a: number, b: number) {
+        const diff = a - b;
+        return diff > -EPSILON && diff < EPSILON;
+    }
 }
 
 export class vector {
@@ -39,11 +44,11 @@ export class vector {
         return new vector(this.x * val, this.y * val);
     }
     public divide(val: number): vector {
-        if (numEquals(val, 0)) throw Error("Can't divide by zero.");
+        if (ExtMath.numEquals(val, 0)) throw Error("Can't divide by zero.");
         return new vector(this.x / val, this.y / val);
     }
-    public drag(drag: number): vector {
-        return this.multiply(1 - drag);
+    public drag(drag: number, delta: number): vector {
+        return this.multiply(ExtMath.drag(drag, delta));
     }
     public invert(): vector {
         return new vector(-this.x, -this.y);

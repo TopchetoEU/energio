@@ -1,14 +1,13 @@
 import { player } from "../common/player";
-import { vector, EPSILON } from "../common/vector";
-import * as ws from "websocket";
+import { vector, EPSILON, ExtMath } from "../common/vector";
 import { packet, packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
 import { serverPlanet } from "./serverPlanet";
 
 export const SPEED = 50;
-export const DRAG = .25;
-export const ANGULAR_SPEED = 30;
-export const ANGULAR_DRAG = .25;
+export const DRAG = -.8;
+export const ANGULAR_SPEED = 20;
+export const ANGULAR_DRAG = -.9;
 
 export enum rotationDirection {
     LEFT = -1,
@@ -25,6 +24,8 @@ export class serverPlayer extends player {
     private _angularVelocity: number = 0;
     private _rotationDirection: rotationDirection = rotationDirection.NONE;
     private _planets: serverPlanet[] = [];
+    protected _consumption: number = 0;
+    protected _production: number = 0;
     public readonly _connection: packetConnection;
 
     public get moving() {
@@ -48,10 +49,12 @@ export class serverPlayer extends player {
         return this._angularVelocity;
     }
 
-    public syncPos() {
+    public sync() {
         this._connection.sendPacket(packetCode.SYNCPOS, {
             location: this.location,
-            direction: this.direction
+            direction: this.direction,
+            consumption: this._consumption,
+            production: this._production,
         });
     }
 
@@ -62,11 +65,11 @@ export class serverPlayer extends player {
 
         if (Math.abs(this._angularVelocity) < EPSILON) this._angularVelocity = 0;
         else this._direction += this.angularVelocity * delta;
-        this._angularVelocity *= 1 - ANGULAR_DRAG;
+        this._angularVelocity *= ExtMath.drag(ANGULAR_DRAG, delta);
 
         if (this.moving)
             this._velocity = this._velocity.add(vector.fromDirection(this.direction, false).multiply(SPEED * delta));
-        this._velocity = this._velocity.drag(DRAG);
+        this._velocity = this._velocity.drag(DRAG, delta);
 
         if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
         else this._location = this._location.add(this.velocity);

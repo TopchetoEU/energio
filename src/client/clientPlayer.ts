@@ -26,11 +26,11 @@ export class clientPlayer extends player {
         this.game = controller;
 
         this.imageElement = document.createElement('img');
-        this.imageElement.src = '/static/image/rocket-1.png';
+        this.imageElement.src = '/static/images/player.png';
         this.imageElement.classList.add('movable');
 
         this.usernameElement = document.createElement('span');
-        this.usernameElement.innerText = packet.name;
+        this.usernameElement.innerText = packet.name;   
         this.usernameElement.classList.add('movable');
 
         this.element = document.createElement('div');

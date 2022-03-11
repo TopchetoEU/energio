@@ -4,6 +4,8 @@ import { vector } from "../vector";
 export interface syncPosPacketData {
     location: point;
     direction: number;
+    production: number;
+    consumption: number;
 }
 export interface errorPacketData {
     err: string;
