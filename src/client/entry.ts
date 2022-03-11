@@ -5,6 +5,7 @@ import { clientController } from "./clientController";
 import { clientSocket } from "./clientSocket";
 
 const overlayEl = document.getElementById('overlay') as HTMLElement;
+const guiEl = document.getElementById('gui') as HTMLElement;
 
 (document.getElementById('playbtn') as HTMLElement).onclick = () => {
     let ws = new WebSocket('ws://77.70.55.157:8001');
@@ -12,6 +13,7 @@ const overlayEl = document.getElementById('overlay') as HTMLElement;
         let socket = new clientSocket(ws);
         await clientController.create(socket, (document.getElementById('username') as HTMLInputElement).value);
         overlayEl.style.display = 'none';
+        guiEl.style.display = 'block';
     };
 };
 

@@ -1,9 +1,12 @@
+import { planetConfig } from "../../server/gameConfig";
 import { point } from "../packets";
 import { vector } from "../vector";
 
 export interface syncPosPacketData {
     location: point;
     direction: number;
+}
+export interface syncEngPacketData {
     production: number;
     consumption: number;
 }
@@ -22,6 +25,7 @@ export interface movePacketData {
     newLocation: point;
     newDirection: number;
 }
+
 export interface newPlayerPacketData {
     playerId: number;
     name: string;
@@ -36,11 +40,15 @@ export interface kickPacketData {
     message: string;
 }
 
-export interface newPlanet {
-    id: number;
-    location: vector;
-}
+export type newPlanetPacketData = planetConfig & { id: number };
 
-export interface delPlanet {
+export interface delPlanetPacketData {
     id: number;
+}
+export interface ownPlanetPacketData {
+    playerId: number;
+    planetId: number;
+}
+export interface disownPlanetPacketData {
+    planetId: number;
 }

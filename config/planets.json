@@ -1,0 +1,90 @@
+[
+    {
+        "name": "Titania",
+        "location": {
+            "x": 500,
+            "y": 1000
+        },
+        "normalSrc": "/static/images/planets/planet-1.png",
+        "colonySrc": "/static/images/planets/planet-1-colony.png",
+        "limit": 0.420,
+        "prodPerCapita": 0.100
+    },
+    {
+        "name": "Gaya",
+        "location": {
+            "x": 1500,
+            "y": 500
+        },
+        "normalSrc": "/static/images/planets/planet-2.png",
+        "colonySrc": "/static/images/planets/planet-2-colony.png",
+        "limit": 6.900,
+        "prodPerCapita": 500
+    },
+    {
+        "name": "Natar",
+        "location": {
+            "x": -500,
+            "y": 200
+        },
+        "normalSrc": "/static/images/planets/planet-3.png",
+        "colonySrc": "/static/images/planets/planet-3-colony.png",
+        "limit": 0.350,
+        "prodPerCapita": 5000
+    },
+    {
+        "name": "Atlas",
+        "location": {
+            "x": -100,
+            "y": -500
+        },
+        "normalSrc": "/static/images/planets/planet-4.png",
+        "colonySrc": "/static/images/planets/planet-4-colony.png",
+        "limit": 10.000,
+        "prodPerCapita": 2500
+    },
+    {
+        "location": {
+            "x": 0,
+            "y": 0
+        },
+        "name": "Saaron",
+        "normalSrc": "/static/images/planets/planet-5.png",
+        "colonySrc": "/static/images/planets/planet-5-colony.png",
+        "limit": 0.100,
+        "prodPerCapita": 20000
+    },
+    {
+        "location": {
+            "x": 1000,
+            "y": -800
+        },
+        "name": "Atrox",
+        "normalSrc": "/static/images/planets/planet-6.png",
+        "colonySrc": "/static/images/planets/planet-6-colony.png",
+        "limit": 0.250,
+        "prodPerCapita": 500
+    },
+    {
+        "location": {
+            "x": -2000,
+            "y": -500
+        },
+        "name": "Aquantis",
+        "normalSrc": "/static/images/planets/planet-7.png",
+        "colonySrc": "/static/images/planets/planet-7-colony.png",
+        "limit": 1.500,
+        "prodPerCapita": 800
+    },
+    {
+        "location": {
+            "x": 200,
+            "y": 500
+        },
+        "name": "Gulacio",
+        "normalSrc": "/static/images/planets/planet-8.png",
+        "colonySrc": "/static/images/planets/planet-8-colony.png",
+        "limit": 15.000,
+        "prodPerCapita": 1600
+    }
+]

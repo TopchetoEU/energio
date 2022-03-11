@@ -1,0 +1,7 @@
+{
+    "name": "Cantics",
+    "normalSrc": "/static/images/planets/starter.png",
+    "colonySrc": "/static/images/planets/starter-colony.png",
+    "limit": 50.000,
+    "prodPerCapita": 100
+}

@@ -10,13 +10,13 @@ export class clientPlayer extends player {
     private readonly game: clientController;
 
     public update(packet: movePacketData) {
-        this._direction = packet.newDirection;
-        this._location = new vector(packet.newLocation.x, packet.newLocation.y);
+        this.direction = packet.newDirection;
+        this.location = new vector(packet.newLocation.x, packet.newLocation.y);
         this.updateElement();
     }
     public updateElement() {
         this.element.style.transform = `translate(${this.location.x}px, ${this.location.y}px)`;
-        this.usernameElement.style.transform = `rotate(${this.game.direction}deg) translateY(-10px)`;
+        this.usernameElement.style.transform = `rotate(${this.game.direction}deg) translateY(-40px)`;
         this.imageElement.style.transform = `rotate(${this.direction}deg)`;
     }
 

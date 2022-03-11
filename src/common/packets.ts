@@ -14,8 +14,11 @@ export enum packetCode {
     CONTROL,
     MOVE,
     SYNCPOS,
+    SYNCENG,
     NEWPLAYER,
     DELPLAYER,
     NEWPLANET,
     DELPLANET,
+    OWNPLANET,
+    DISOWNPLANET,
 }

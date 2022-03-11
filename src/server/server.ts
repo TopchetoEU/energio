@@ -4,8 +4,9 @@ import * as ws from "websocket";
 import * as http from "http";
 import { promisify } from "util";
 import { serverController } from "./serverController";
+import { getConfig } from "./gameConfig";
 
-new serverController(8001);
+new serverController(8001, getConfig());
 
 const app = express();
 app.use('/static', express.static(path.resolve(__dirname, '../../static')));

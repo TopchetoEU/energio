@@ -1,31 +1,31 @@
+import { energyUnit } from "../server/energy";
+import { planet, planetlike } from "./planet";
 import { vector } from "./vector";
 
+export interface playerlike {
+    name: string;
+    id: number;
+    ownedPlanets: planetlike[];
+}
+
 export abstract class player {
-    private _name: string;
-    protected _location: vector;
-    protected _direction: number;
-    protected _moving: boolean = false;
+    public location: vector;
+    public direction: number;
+    public moving: boolean = false;
+    protected _ownedPlanets: planet[] = [];
     public readonly id: number;
 
-    public get name() {
-        return this._name;
+    public toPlayerLike(): playerlike {
+        return {
+            id: this.id,
+            name: this.name,
+            ownedPlanets: this._ownedPlanets.map(v => v.toPlanetLike(false)),
+        };
     }
 
-    public get location() {
-        return this._location;
-    }
-    public get direction() {
-        return this._direction;
-    }
-
-    public get moving() {
-        return this._moving;
-    }
-
-    public constructor(name: string, id: number, initialLocation?: vector | undefined, direction?: number | undefined) {
+    public constructor(public readonly name: string, id: number, initialLocation?: vector | undefined, direction?: number | undefined) {
         this.id = id;
-        this._name = name;
-        this._location = initialLocation ?? vector.zero;
-        this._direction = direction ?? 0;
+        this.location = initialLocation ?? vector.zero;
+        this.direction = direction ?? 0;
     }
 }

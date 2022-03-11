@@ -11,7 +11,7 @@
 <body>
     <div id="game" class="game movable">
         <div id="background">
-            <img src="/static/images/planet-1.png" alt="" class="planet">
+            <img src="/static/images/planets/planet-1.png" alt="" class="planet">
         </div>
         <div id="self" class="player movable">
             <img src="/static/images/player.png">
@@ -23,6 +23,15 @@
             <h3>Input a username and play!</h3>
             <input type="text" id="username" spellcheck="false">
             <button id="playbtn">Play!</button>
+        </div>
+    </div>
+    <div id="gui">
+        <div class="energyContainer">
+            <span>Energy</span>
+            <span id="engpercent">0%</span>
+            <div class="energyFullBar">
+                <div id="energybar"></div>
+            </div>
         </div>
     </div>
 </body>
