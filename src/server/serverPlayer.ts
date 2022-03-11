@@ -3,6 +3,7 @@ import { vector, EPSILON } from "../common/vector";
 import * as ws from "websocket";
 import { packet, packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
+import { serverPlanet } from "./serverPlanet";
 
 export const SPEED = 50;
 export const DRAG = .25;
@@ -23,6 +24,7 @@ export class serverPlayer extends player {
     private _velocity: vector = vector.zero;
     private _angularVelocity: number = 0;
     private _rotationDirection: rotationDirection = rotationDirection.NONE;
+    private _planets: serverPlanet[] = [];
     public readonly _connection: packetConnection;
 
     public get moving() {
@@ -68,6 +70,11 @@ export class serverPlayer extends player {
 
         if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
         else this._location = this._location.add(this.velocity);
+
+        this._planets = this._planets.filter(v => v.peopleCount < 1);
+        this._planets.forEach(v => {
+            v.update(delta);
+        });
     }
 
     public constructor(name: string, connection: packetConnection) {

@@ -16,4 +16,6 @@ export enum packetCode {
     SYNCPOS,
     NEWPLAYER,
     DELPLAYER,
+    NEWPLANET,
+    DELPLANET,
 }

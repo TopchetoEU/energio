@@ -1,5 +1,4 @@
-import { game } from "./game";
-import { EPSILON, vector } from "./vector";
+import { vector } from "./vector";
 
 export abstract class player {
     private _name: string;

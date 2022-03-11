@@ -7,7 +7,7 @@ import { logoffPacketData, packetCode } from "../common/packets";
 import { controlPacketData, controlType, loginPacketData } from "../common/packets/client";
 import { serverSocket } from "./serverSocket";
 import { first } from "rxjs";
-import { newPlayerPacketData } from "../common/packets/server";
+import { movePacketData, newPlayerPacketData } from "../common/packets/server";
 
 interface context {
     connection: ws.connection;
@@ -60,23 +60,39 @@ export class serverController {
 
             try {
                 const packet = await con.oncePacket<loginPacketData>(packetCode.LOGIN);
-                
-                let player = this.game.login(con, packet.data.name) as serverPlayer;
-                
-                if (!player) {
-                    con.sendError("Player already logged in", "Try changing your username.");
+
+                console.log(/^(\w{3,16})$/g.test(packet.data.name));
+                if (!/^(\w{3,16})$/g.test(packet.data.name)) {
+                    con.sendError("Invalid name given", "Names must be alphanumeric with underscores, from 3 to 16 characters in length.");
                     con.close();
                 }
                 else {
-                    socket.onClose.pipe(first()).subscribe(() => this.game.logout(player));
-                    await con.sendPacket(packetCode.INIT, {
-                        location: player.location,
-                        rotation: player.direction,
-                        selfId: player.id,
-                    });
-
-                    con.onPacket<logoffPacketData>(packetCode.LOGOFF).subscribe(this.onLogoff(player));
-                    con.onPacket<controlPacketData>(packetCode.CONTROL).subscribe(this.onControl(player));
+                    console.log(packet.data.name);
+                    console.log(this.game._players.map(v => v.name));
+                    let player = this.game.login(con, packet.data.name) as serverPlayer;
+                
+                    if (!player) {
+                        con.sendError("Player already logged in", "Try changing your username.");
+                        con.close();
+                    }
+                    else {
+                        socket.onClose.pipe(first()).subscribe(() => this.game.logout(player));
+                        await con.sendPacket(packetCode.INIT, {
+                            location: player.location,
+                            rotation: player.direction,
+                            selfId: player.id,
+                        });
+    
+                        this.game._players.filter(v => v.id != player.id).forEach(v => player._connection.sendPacket(packetCode.NEWPLAYER, {
+                            playerId: v.id,
+                            name: v.name,
+                            location: v.location,
+                            direction: v.direction,
+                        }));
+    
+                        con.onPacket<logoffPacketData>(packetCode.LOGOFF).subscribe(this.onLogoff(player));
+                        con.onPacket<controlPacketData>(packetCode.CONTROL).subscribe(this.onControl(player));
+                    }
                 }
             }
             catch (e: any) {

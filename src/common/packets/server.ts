@@ -1,4 +1,5 @@
 import { point } from "../packets";
+import { vector } from "../vector";
 
 export interface syncPosPacketData {
     location: point;
@@ -31,4 +32,13 @@ export interface delPlayerPacketData {
 
 export interface kickPacketData {
     message: string;
+}
+
+export interface newPlanet {
+    id: number;
+    location: vector;
+}
+
+export interface delPlanet {
+    id: number;
 }

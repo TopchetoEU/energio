@@ -93,6 +93,11 @@ export class vector {
         return new vector(this.x, val);
     }
 
+    public inViewDistance(other: vector, viewDist: number): boolean {
+        let vec = this.subtract(other);
+        return Math.abs(vec.x) + Math.abs(vec.y) < viewDist;
+    }
+
     constructor(x: number, y: number) {
         this.x = x;
         this.y = y;

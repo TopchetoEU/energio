@@ -4,7 +4,7 @@ module.exports = {
     mode: "production",
     entry: "./build/client/entry.js",
     output: {
-        path: _path.resolve(__dirname, 'build/static/js'),
+        path: _path.resolve(__dirname, 'static/js'),
         filename: 'bundle.js',
         publicPath: '/static/js',
         // library: {

@@ -2,7 +2,7 @@ import { fromEvent, Subscription } from "rxjs";
 import { packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
 import { controlType } from "../common/packets/client";
-import { initPacketData, newPlayerPacketData, syncPosPacketData } from "../common/packets/server";
+import { delPlayerPacketData, initPacketData, movePacketData, newPlayerPacketData, syncPosPacketData } from "../common/packets/server";
 import { socket } from "../common/socket";
 import { vector } from "../common/vector";
 import { clientPlayer } from "./clientPlayer";
@@ -20,8 +20,9 @@ export class clientController {
     private subscribers: Subscription[] = [];
     private players: clientPlayer[] = [];
 
-    private location: vector;
-    private direction: number;
+    public location: vector;
+    public direction: number;
+    public id: number;
 
     private gameElement = document.getElementById('game') as HTMLDivElement;
     private playerElement = document.getElementById('self') as HTMLDivElement;
@@ -35,6 +36,7 @@ export class clientController {
         this._connection = connection;
         this.location = new vector(packet.location.x, packet.location.y);
         this.direction = packet.rotation;
+        this.id = packet.selfId;
     
         this.subscribers.push(
             onKeydown.subscribe(kb => {
@@ -78,7 +80,20 @@ export class clientController {
             this.updateElements();
         });
         this._connection.onPacket<newPlayerPacketData>(packetCode.NEWPLAYER).subscribe(packet => {
-            this.players.push(new clientPlayer(packet.data));
+            this.players.push(new clientPlayer(packet.data, this));
+        });
+        this._connection.onPacket<delPlayerPacketData>(packetCode.DELPLAYER).subscribe(packet => {
+            this.players = this.players.filter(v => {
+                if (v.id === packet.data.playerId) {
+                    v.element.remove();
+                    return false;
+                }
+                return true;
+            });
+        });
+        this._connection.onPacket<movePacketData>(packetCode.MOVE).subscribe(packet => {
+            if (packet.data.playerId === this.id) return;
+            this.players.find(v => v.id === packet.data.playerId)?.update(packet.data);
         });
     }
 
@@ -91,7 +106,7 @@ export class clientController {
         ]);
 
         if (res.type === "ERR") {
-            throw new Error("Already logged in.");
+            throw new Error(res.message + ": " + res.description);
         }
         else {
             return new clientController(res.data, con, name);
