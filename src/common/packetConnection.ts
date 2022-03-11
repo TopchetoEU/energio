@@ -1,6 +1,7 @@
 import * as ws from "websocket"
 import * as rx from "rxjs"
 import { packetCode } from "./packets"
+import { socket } from "./socket";
 
 interface acknowledgement {
     type: "ACKN";
@@ -13,7 +14,7 @@ export interface packet<T> {
     responseId?: number;
     data: T;
 };
-interface error {
+export interface error {
     type: "ERR";
     message: string;
     description?: string;
@@ -24,13 +25,13 @@ type response = acknowledgement | packet<unknown> | error;
 let nextId = 0;
 
 export class packetConnection {
-    private _con: ws.connection;
-    private _conHandle?: (...args: any) => void;
+    private _socket: socket;
+    private _subscription?: rx.Subscription;
     private _timeout: number;
-    private _observable: rx.Observable<response>;
+    private _subject: rx.Subject<response> = new rx.Subject();
 
     public get connection() {
-        return this._con;
+        return this._socket;
     }
 
     public sendError(message: string, description?: string): Promise<void> {
@@ -42,10 +43,8 @@ export class packetConnection {
     }
     private respond(res: response): Promise<void> {
         return new Promise((resolve, reject) => {
-            this._con.send(JSON.stringify(res), err => {
-                if (err) reject(err);
-                else if (res.type == "PACK") {
-                    console.log(res.id);
+            this._socket.send(JSON.stringify(res)).then(() => {
+                if (res.type == "PACK") {
                     this.onceAcknowledgement(res.id)
                         .then(resolve)
                         .catch(() => reject({
@@ -56,7 +55,8 @@ export class packetConnection {
                 else {
                     resolve();
                 }
-            });
+            })
+            .catch(err => reject(err));
         });
     }
     private formatError(err: string): Promise<void> {
@@ -67,7 +67,7 @@ export class packetConnection {
         return new Promise((resolve, reject) =>
             this.onAnyPacket<T>().pipe(
                 rx.first(),
-                rx.timeout(this._timeout)
+                rx.timeout(this._timeout),
             )
             .subscribe({
                 error: reject,
@@ -75,11 +75,11 @@ export class packetConnection {
             })
         );
     }
-    public oncePacket<T>(type: packetCode): Promise<packet<T>> {
+    public oncePacket<T>(...types: packetCode[]): Promise<packet<T>> {
         return new Promise((resolve, reject) =>
-            this.onPacket<T>(type).pipe(
+            this.onPacket<T>(...types).pipe(
                 rx.first(),
-                rx.timeout(this._timeout)
+                rx.timeout(this._timeout),
             )
             .subscribe({
                 error: reject,
@@ -91,7 +91,7 @@ export class packetConnection {
         return new Promise((resolve, reject) =>
             this.onAnyPacket<T>().pipe(
                 rx.filter(v => v.id === responseTo.id),
-                rx.first()
+                rx.first(),
             ).subscribe({
                 next: resolve,
                 error: reject,
@@ -100,11 +100,24 @@ export class packetConnection {
     }
     private onceAcknowledgement(id: number): Promise<void> {
         return new Promise((resolve, reject) =>
-            this._observable.pipe(
-                rx.filter(v => v.type == "ACKN" && v.id == id),
-                rx.map(() => undefined),
+            this._subject.pipe(
+                rx.filter(v => {
+                    return v.type == "ACKN" && v.id == id;
+                }),
                 rx.first(),
+                rx.map(() => undefined),
                 rx.timeout(this._timeout),
+                rx.share(),
+            ).subscribe({
+                next: resolve,
+                error: reject,
+            })
+        );
+    }
+    public onceError(): Promise<error> {
+        return new Promise((resolve, reject) =>
+            this.onError().pipe(
+                rx.first(),
             ).subscribe({
                 next: resolve,
                 error: reject,
@@ -112,21 +125,27 @@ export class packetConnection {
         );
     }
 
-    public onPacket<T = unknown>(type: packetCode): rx.Observable<packet<T>> {
+    public onPacket<T = unknown>(...types: packetCode[]): rx.Observable<packet<T>> {
         return this.onAnyPacket<T>().pipe(
-            rx.filter(v => v.code === type)
+            rx.filter(v => types.includes(v.code)),
         );
     }
     public onAnyPacket<T = unknown>(): rx.Observable<packet<T>> {
-        return this._observable.pipe(
+        return this._subject.pipe(
             rx.filter(v => v.type == "PACK"),
-            rx.map(v => v as packet<T>)
+            rx.map(v => v as packet<T>),
+            rx.share(),
+        );
+    }
+    public onError(): rx.Observable<error> {
+        return this._subject.pipe(
+            rx.filter(v => v.type == "ERR"),
+            rx.map(v => v as error),
         );
     }
 
     public detachHandles() {
-        if (this._conHandle)
-            this._con.off('message', this._conHandle);
+        this._subscription?.unsubscribe();
     }
 
     public sendPacket(type: packetCode, data: any, responseTo?: packet<any>): Promise<void> {
@@ -144,41 +163,34 @@ export class packetConnection {
         if (closeWsConnection) this.connection.close();
     }
 
-    public constructor(connection: ws.connection, timeout: number = 1000) {
+    // private processedIds: number[] = [];
+
+    public constructor(connection: socket, timeout: number = 1000) {
         this._timeout = timeout;
-        this._con = connection;
-        this._observable = new rx.Observable(sub => {
-            this._con.on('message', this._conHandle = (msg: ws.Message) => {
-                if (msg.type === "binary") {
-                    this.formatError("Expected UTF8 data, got binary instead." );
+        this._socket = connection;
+
+        this._socket.onMessage.subscribe(async msg => {
+            let response: response;
+            try {
+                response = JSON.parse(msg) as response;
+
+                if (typeof response.type != 'string') {
+                    this.formatError("No 'type' string property present in given JSON.");
                 }
                 else {
-                    try {
-                        let response = JSON.parse(msg.utf8Data) as response;
-                        if (typeof response.type != 'string') {
-                            this.formatError("No 'type' string property present in given JSON.");
-                        }
-                        else {
-                            if (response.type === 'ACKN' || response.type === 'PACK') {
-                                if (typeof response.id != 'number') {
-                                    this.formatError("No 'id' number property present in given JSON.");
-                                }
-                            }
-                            switch (response.type) {
-                                case "PACK":
-                                    if (typeof response.id != 'number')
-                                    this.acknowledge(response.id);
-                                case "ACKN":
-                                case "ERR":
-                                    sub.next(response);
-                            }
+                    if (response.type === 'ACKN' || response.type === 'PACK') {
+                        if (typeof response.id != 'number') {
+                            this.formatError("No 'id' number property present in given JSON.");
+                            return;
                         }
                     }
-                    catch {
-                        this.formatError("Invalid JSON given." );
-                    }
+                    if (response.type == "PACK") await this.acknowledge(response.id);
+                    this._subject.next(response);
                 }
-            });
+            }
+            catch {
+                this.formatError("Invalid JSON given." );
+            }
         });
     }
 }

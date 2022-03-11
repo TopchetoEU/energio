@@ -42,8 +42,8 @@ export class vector {
         if (numEquals(val, 0)) throw Error("Can't divide by zero.");
         return new vector(this.x / val, this.y / val);
     }
-    public drag(drag: number, delta: number): vector {
-        return this.multiply(1 - drag * delta);
+    public drag(drag: number): vector {
+        return this.multiply(1 - drag);
     }
     public invert(): vector {
         return new vector(-this.x, -this.y);
@@ -99,11 +99,11 @@ export class vector {
     }
 
     public static fromDirection(direction: number, inRadians: boolean = false): vector {
-        if (!inRadians) direction = direction / 180 * Math.PI;
+        if (!inRadians) direction = direction * Math.PI / 180;
 
-        const x = Math.cos(direction);
-        const y = Math.sin(direction);
+        const x = Math.sin(direction);
+        const y = Math.cos(direction);
 
-        return new vector(x, y);
+        return new vector(x, -y);
     }
 }

@@ -1,21 +1,20 @@
 import { serverGame } from "./serverGame";
 import * as ws from "websocket";
 import * as http from "http";
-import { promisify } from "util";
-import { player } from "../common/player";
 import { rotationDirection, serverPlayer } from "./serverPlayer";
 import { packet, packetConnection } from "../common/packetConnection";
 import { logoffPacketData, packetCode } from "../common/packets";
-import { Observable, TimeoutError } from "rxjs";
 import { controlPacketData, controlType, loginPacketData } from "../common/packets/client";
-import { syncPosPacketData } from "../common/packets/server";
+import { serverSocket } from "./serverSocket";
+import { first } from "rxjs";
+import { newPlayerPacketData } from "../common/packets/server";
 
 interface context {
     connection: ws.connection;
     player?: serverPlayer,
 }
 
-const TIMEOUT = 20000;
+const TIMEOUT = 2000;
 
 export class serverController {
     private game: serverGame;
@@ -26,10 +25,16 @@ export class serverController {
         return packet => {
             if (packet.data.type === controlType.Forward) player.moving = packet.data.starting;
             else if (packet.data.starting) {
-                if (packet.data.type === controlType.Left) player.rotationDirection = rotationDirection.LEFT;
-                else if (packet.data.type === controlType.Right) player.rotationDirection = rotationDirection.RIGHT;
+                if (packet.data.type === controlType.Left) player.rotationDirection--;
+                else if (packet.data.type === controlType.Right) player.rotationDirection++;
             }
-            else player.rotationDirection = rotationDirection.NONE;
+            else {
+                if (packet.data.type === controlType.Left) player.rotationDirection++;
+                else if (packet.data.type === controlType.Right) player.rotationDirection--;
+            }
+
+            if (player.rotationDirection < -1) player.rotationDirection = -1;
+            if (player.rotationDirection > 1) player.rotationDirection = 1;
         };
     }
     private onLogoff(player: serverPlayer): (packet: packet<logoffPacketData>) => void {
@@ -50,18 +55,24 @@ export class serverController {
         this.game = new serverGame();
 
         this.wsServer.on('request', async req => {
-            const con = new packetConnection(req.accept(), TIMEOUT);
+            const socket = new serverSocket(req.accept());
+            const con = new packetConnection(socket, TIMEOUT);
+
             try {
                 const packet = await con.oncePacket<loginPacketData>(packetCode.LOGIN);
-
+                
                 let player = this.game.login(con, packet.data.name) as serverPlayer;
-
-                if (!player)
+                
+                if (!player) {
                     con.sendError("Player already logged in", "Try changing your username.");
+                    con.close();
+                }
                 else {
+                    socket.onClose.pipe(first()).subscribe(() => this.game.logout(player));
                     await con.sendPacket(packetCode.INIT, {
                         location: player.location,
                         rotation: player.direction,
+                        selfId: player.id,
                     });
 
                     con.onPacket<logoffPacketData>(packetCode.LOGOFF).subscribe(this.onLogoff(player));
@@ -69,10 +80,15 @@ export class serverController {
                 }
             }
             catch (e: any) {
+                console.log(e);
                 con.sendError(e.message ?? 'Generic error.', e.description);
                 con.connection.close();
                 console.log("User failed to provide correct packages.");
             }
         });
+
+        setInterval(() => {
+            this.game.update(0.1);
+        }, 100);
     }
 }

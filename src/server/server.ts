@@ -21,7 +21,7 @@ new serverController(8001);
 //     });
 // });
 
-// const app = express();
-// app.use('/static', express.static(path.resolve(__dirname, '../static')));
-// app.get('/', (req,res) => res.redirect('/static/html/index.html'));
-// app.listen(80, () => console.log("Listening to :80!"));
+const app = express();
+app.use('/static', express.static(path.resolve(__dirname, '../static')));
+app.get('/', (req,res) => res.redirect('/static/html/index.html'));
+app.listen(80, () => console.log("Listening to :80!"));

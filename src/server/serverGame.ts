@@ -10,15 +10,38 @@ export class serverGame extends game {
         throw new Error("Method not implemented.");
     }
 
+    public update(delta: number) {
+        this.players.forEach(v => {
+            (v as serverPlayer).update(delta);
+            (v as serverPlayer).syncPos();
+        });
+    }
+
     public login(connection: packetConnection, name: string): player | null {
         if (this.getPlayer(name)) return null;
-
+        
         const player = new serverPlayer(name, connection);
-        this.players.push(player);
+
+        this.players.forEach(v => (v as serverPlayer)._connection.sendPacket(packetCode.NEWPLAYER, {
+            playerId: player.id,
+            name: player.name,
+            location: player.location,
+            direction: player.direction,
+        }));
+
+        this.playerList.push(player);
         return player;
     }
     public async logout(player: serverPlayer, reason?: string | undefined): Promise<void> {
-        if (reason) await player._connection.sendPacket(packetCode.KICK, { message: reason });
-        player._connection.close();
+        this.playerList = this.playerList.filter(v => {
+            return v.id !== player.id;
+        });
+        this.players.forEach(v => (v as serverPlayer)._connection.sendPacket(packetCode.DELPLAYER, {
+            playerId: player.id,
+        }));
+        if (!player._connection.connection.closed) {
+            if (reason) await player._connection.sendPacket(packetCode.KICK, { message: reason });
+            player._connection.close();
+        }
     }
 }

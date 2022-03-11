@@ -2,7 +2,7 @@ import { player } from "./player";
 
 
 export abstract class game {
-    private playerList: player[] = [];
+    protected playerList: player[] = [];
 
     public get players() {
         return [...this.playerList];

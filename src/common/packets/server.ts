@@ -11,6 +11,7 @@ export interface errorPacketData {
 export interface initPacketData {
     location: point;
     rotation: number;
+    selfId: number;
 }
 
 export interface movePacketData {
@@ -26,4 +27,8 @@ export interface newPlayerPacketData {
 }
 export interface delPlayerPacketData {
     playerId: number;
+}
+
+export interface kickPacketData {
+    message: string;
 }

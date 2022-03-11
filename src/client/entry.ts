@@ -1,4 +1,8 @@
+import { map, Observable } from "rxjs";
+import WebSocketAsPromised from "websocket-as-promised";
 import { vector } from "../common/vector";
+import { clientController } from "./clientController";
+import { clientSocket } from "./clientSocket";
 
 class bgObjecet {
     private _position: vector;
@@ -32,7 +36,16 @@ const bgElement = document.getElementById('background');
 const obj = new bgObjecet('/static/images/planet-1.png', new vector(100, 500));
 obj.update();
 bgElement?.appendChild(obj.element);
+const overlayEl = document.getElementById('overlay') as HTMLElement;
 
-document.body.onmousedown = e => {
-    obj.position = new vector(e.clientX, e.clientY);
-}
+(document.getElementById('playbtn') as HTMLElement).onclick = () => {
+    overlayEl.style.display = 'none';
+
+    let ws = new WebSocket('ws://77.70.55.157:8001');
+    ws.onopen = async () => {
+        let socket = new clientSocket(ws);
+        let a = await clientController.create(socket, (document.getElementById('username') as HTMLInputElement).value);
+    };
+};
+
+

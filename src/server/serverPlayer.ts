@@ -4,10 +4,10 @@ import * as ws from "websocket";
 import { packet, packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
 
-export const SPEED = 2;
-export const DRAG = .1;
-export const ANGULAR_SPEED = 45;
-export const ANGULAR_DRAG = .1;
+export const SPEED = 50;
+export const DRAG = .25;
+export const ANGULAR_SPEED = 30;
+export const ANGULAR_DRAG = .25;
 
 export enum rotationDirection {
     LEFT = -1,
@@ -17,12 +17,17 @@ export enum rotationDirection {
 
 export type packetHandle<T> = (player: serverPlayer, packet: packet<T>) => void;
 
+let nextId = 1;
+
 export class serverPlayer extends player {
     private _velocity: vector = vector.zero;
     private _angularVelocity: number = 0;
     private _rotationDirection: rotationDirection = rotationDirection.NONE;
     public readonly _connection: packetConnection;
 
+    public get moving() {
+        return this._moving;
+    }
     public set moving(val: boolean) {
         this._moving = val;
     }
@@ -53,21 +58,20 @@ export class serverPlayer extends player {
     
         this._angularVelocity += this._rotationDirection * ANGULAR_SPEED;
 
-        this._angularVelocity *= 1 - ANGULAR_DRAG * delta;
-
         if (Math.abs(this._angularVelocity) < EPSILON) this._angularVelocity = 0;
         else this._direction += this.angularVelocity * delta;
+        this._angularVelocity *= 1 - ANGULAR_DRAG;
 
         if (this.moving)
             this._velocity = this._velocity.add(vector.fromDirection(this.direction, false).multiply(SPEED * delta));
-        this._velocity = this._velocity.drag(DRAG, delta);
+        this._velocity = this._velocity.drag(DRAG);
 
         if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
         else this._location = this._location.add(this.velocity);
     }
 
     public constructor(name: string, connection: packetConnection) {
-        super(name);
+        super(name, nextId++);
         this._connection = connection;
     }
 }
