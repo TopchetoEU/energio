@@ -4,8 +4,9 @@ import { packet, packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
 import { serverPlanet } from "./serverPlanet";
 import { energyUnit } from "./energy";
+import { serverController } from "./serverController";
 
-export const SPEED = 50;
+export const SPEED = 100;
 export const DRAG = -.8;
 export const ANGULAR_SPEED = 20;
 export const ANGULAR_DRAG = -.9;
@@ -24,7 +25,6 @@ export class serverPlayer extends player implements energyUnit {
     private _velocity: vector = vector.zero;
     private _angularVelocity: number = 0;
     private _rotationDirection: rotationDirection = rotationDirection.NONE;
-    public planets: serverPlanet[] = [];
     protected _consumption: number = 0;
     protected _production: number = 0;
     public readonly _connection: packetConnection;
@@ -64,7 +64,7 @@ export class serverPlayer extends player implements energyUnit {
         });
     }
 
-    public update(delta: number): void {
+    public async update(delta: number, controller: serverController): Promise<void> {
         if (delta <= EPSILON) return;
     
         this._angularVelocity += this._rotationDirection * ANGULAR_SPEED;
@@ -80,16 +80,18 @@ export class serverPlayer extends player implements energyUnit {
         if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
         else this.location = this.location.add(this.velocity);
 
-        this.planets = this.planets.filter(v => v.population < 1);
-        this.planets.forEach(v => {
-            v.update(delta);
+        for (let planet of this.ownedPlanets.filter(v => v.population < 1)) {
+            await controller.disownPlanet(planet as serverPlanet);
+        }
+        this.ownedPlanets.forEach(v => {
+            (v as serverPlanet).update(delta);
         });
-        this._production = this.planets.reduce((prev, curr) => prev + curr.production, 0);
-        this._consumption = this.planets.reduce((prev, curr) => prev + curr.consumption, 0);
+        this._production = this.ownedPlanets.reduce((prev, curr) => prev + curr.production, 0) / 1000;
+        this._consumption = this.ownedPlanets.reduce((prev, curr) => prev + curr.consumption, 0) / 1000;
     }
 
-    public constructor(name: string, connection: packetConnection) {
-        super(name, nextId++);
+    public constructor(name: string, connection: packetConnection, location?: vector, direction?: number) {
+        super(name, nextId++, location, direction);
         this._connection = connection;
     }
 }

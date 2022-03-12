@@ -1,4 +1,4 @@
-import { newPlanetPacketData, ownPlanetPacketData } from "../common/packets/server";
+import { newPlanetPacketData, ownPlanetPacketData, syncPlanet as syncPlanetPacketData } from "../common/packets/server";
 import { planet } from "../common/planet";
 import { player } from "../common/player";
 import { vector } from "../common/vector";
@@ -7,6 +7,7 @@ import { clientPlayer } from "./clientPlayer";
 export class clientPlanet extends planet {
     public readonly element: HTMLDivElement;
     public readonly imgElement: HTMLImageElement;
+    public selected: boolean = false;
 
     public get production(): number {
         return 0;
@@ -14,15 +15,21 @@ export class clientPlanet extends planet {
 
     public updateElement() {
         this.element.style.transform = `translate(${this.location.x}px, ${this.location.y}px)`;
-        console.log(this.colonySrc);
-        if (this.owner)
-            this.imgElement.src = this.colonySrc;
+
+        if (this.owner) {
+            if (this.selected) this.imgElement.src = this.selectedSrc;
+            else this.imgElement.src = this.colonySrc;
+        }
         else
             this.imgElement.src = this.normalSrc;
     }
+    public sync(packet: syncPlanetPacketData) {
+        this.population = packet.population;
+        this.updateElement();
+    }
 
     constructor(packet: newPlanetPacketData) {
-        super(packet.id, packet.prodPerCapita, packet.limit, packet.normalSrc, packet.colonySrc, packet.selectedSrc, new vector(packet.location.x, packet.location.y));
+        super(packet.id, packet.prodPerCapita, packet.limit, packet.normalSrc, packet.colonySrc, packet.selectedSrc, packet.name, new vector(packet.location.x, packet.location.y));
 
         this.element = document.createElement('div');
         this.element.classList.add('player');

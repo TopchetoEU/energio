@@ -1,15 +1,7 @@
 import { energyUnit } from "../server/energy";
-import { player, playerlike } from "./player";
+import { player } from "./player";
 import { vector } from "./vector";
 
-export interface planetlike {
-    id: number;
-    population: number;
-    production: number;
-    consumption: number;
-    productionPerCapita: number;
-    owner?: playerlike;
-}
 export abstract class planet implements energyUnit {
     public readonly location: vector;
     public owner?: player;
@@ -23,17 +15,6 @@ export abstract class planet implements energyUnit {
         return this.limit * this.productionPerCapita;
     }
 
-    public toPlanetLike(keepOwner: boolean = true): planetlike {
-        return {
-            consumption: this.consumption,
-            id: this.id,
-            population: this.population,
-            production: this.production,
-            productionPerCapita: this.productionPerCapita,
-            owner: keepOwner ? this.owner?.toPlayerLike() : undefined,
-        };
-    }
-
     public constructor(
         public readonly id: number,
         public readonly productionPerCapita: number,
@@ -41,6 +22,7 @@ export abstract class planet implements energyUnit {
         public readonly normalSrc: string,
         public readonly colonySrc: string,
         public readonly selectedSrc: string,
+        public readonly name: string,
         initLocation: vector
     ) {
         this.location = initLocation;

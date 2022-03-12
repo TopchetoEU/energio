@@ -1,9 +1,9 @@
-import { fromEvent, Subscription } from "rxjs";
+import { ConnectableObservable, fromEvent, Subscription } from "rxjs";
 import { createModuleResolutionCache, validateLocaleAndSetLanguage } from "typescript";
 import { packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
 import { controlType } from "../common/packets/client";
-import { delPlanetPacketData, delPlayerPacketData, initPacketData, movePacketData, newPlanetPacketData, newPlayerPacketData, ownPlanetPacketData, syncEngPacketData, syncPosPacketData } from "../common/packets/server";
+import { delPlanetPacketData, delPlayerPacketData, disownPlanetPacketData, initPacketData, movePacketData, newPlanetPacketData, newPlayerPacketData, ownPlanetPacketData, syncEngPacketData, syncPosPacketData } from "../common/packets/server";
 import { player } from "../common/player";
 import { socket } from "../common/socket";
 import { vector } from "../common/vector";
@@ -69,6 +69,24 @@ export class clientController extends player implements energyUnit {
         this.location = new vector(packet.location.x, packet.location.y);
         this.direction = packet.direction;
         this.updateElements();
+
+        let leastDist = -1;
+        let closestPlanet: clientPlanet | undefined;
+
+        for (let planet of this.ownPlanets) {
+            let dist = planet.location.squaredDistance(this.location);
+            if (leastDist < 0 || dist < leastDist) {
+                leastDist = dist;
+                closestPlanet = planet;
+            }
+            planet.selected = false;
+            planet.updateElement();
+        }
+
+        if (closestPlanet && leastDist < 150 * 150) {
+            closestPlanet.selected = true;
+            closestPlanet.updateElement();
+        }
     }
     private onSyncEng(packet: syncEngPacketData) {
         this._consumption = packet.consumption;
@@ -76,6 +94,7 @@ export class clientController extends player implements energyUnit {
         this.updateBarElements();
     }
     private onNewPlayer(packet: newPlayerPacketData) {
+        if (packet.playerId === this.id) return;
         this.players.push(new clientPlayer(packet, this));
     }
     private onDelPlayer(packet: delPlayerPacketData) {
@@ -106,9 +125,27 @@ export class clientController extends player implements energyUnit {
     private onOwnPlanet(data: ownPlanetPacketData): void {
         let planet = this.getPlanet(data.planetId);
         let player = this.getPlayer(data.playerId);
+
         if (planet) {
             this.planets.push(planet);
             if (player) planet.owner = player;
+            planet.updateElement();
+            if (player === this) {
+                this.ownPlanets.push(planet);
+            }
+        }
+    }
+    private onDisownPlanet(data: disownPlanetPacketData): void {
+        let planet = this.getPlanet(data.planetId);
+
+        console.log(planet);
+
+        if (planet) {
+            if (planet.owner === this) {
+                this.ownPlanets = this.ownPlanets.filter(v => v.id !== planet?.id);
+            }
+            planet.owner = undefined;
+            planet.updateElement();
         }
     }
     private onDelPlanet(data: delPlanetPacketData): void {
@@ -149,6 +186,7 @@ export class clientController extends player implements energyUnit {
         this._connection.onPacket<movePacketData>(packetCode.MOVE).subscribe(v => this.onMovePlayer(v.data));
         this._connection.onPacket<newPlanetPacketData>(packetCode.NEWPLANET).subscribe(v => this.onNewPlanet(v.data));
         this._connection.onPacket<ownPlanetPacketData>(packetCode.OWNPLANET).subscribe(v => this.onOwnPlanet(v.data));
+        this._connection.onPacket<disownPlanetPacketData>(packetCode.DISOWNPLANET).subscribe(v => this.onDisownPlanet(v.data));
     }
 
     public static async create(socket: socket, name: string): Promise<clientController> {

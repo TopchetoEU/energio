@@ -21,4 +21,5 @@ export enum packetCode {
     DELPLANET,
     OWNPLANET,
     DISOWNPLANET,
+    SYNCPLANET,
 }

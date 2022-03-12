@@ -1,9 +1,11 @@
+import { packetCode } from "../common/packets";
+import { syncPlanet } from "../common/packets/server";
 import { planet } from "../common/planet";
 import { ExtMath, vector } from "../common/vector";
 import { planetConfig } from "./gameConfig";
 import { serverPlayer } from "./serverPlayer";
 
-export const GROWTH_RATE = 1.01;
+export const GROWTH_RATE = 0.01;
 let nextId = 0;
 
 export class serverPlanet extends planet {
@@ -12,7 +14,7 @@ export class serverPlanet extends planet {
     }
 
     public update(delta: number) {
-        if (this.owner || this.population) {
+        if (this.owner) {
             this.population *= ExtMath.drag(GROWTH_RATE, delta);
             if (this.population > this.limit) this.population = this.limit;
         }
@@ -21,8 +23,16 @@ export class serverPlanet extends planet {
             this.owner = undefined;
         }
     }
+    public async sync(players: serverPlayer[]): Promise<void> {
+        for (let player of players) {
+            await player._connection.sendPacket(packetCode.SYNCPLANET, {
+                planetId: this.id,
+                population: this.population,
+            });
+        }
+    }
 
     constructor(config: planetConfig) {
-        super(++nextId, config.prodPerCapita, config.limit, config.normalSrc, config.colonySrc, config.selectedSrc, new vector(config.location.x, config.location.y));
+        super(++nextId, config.prodPerCapita, config.limit, config.normalSrc, config.colonySrc, config.selectedSrc, config.name, new vector(config.location.x, config.location.y));
     }
 }
