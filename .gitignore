@@ -1,4 +1,6 @@
 build
 node_modules
 package-lock.json
-static/js
+static/*
+static/!html
+static/!images
