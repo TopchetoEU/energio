@@ -9,7 +9,7 @@
         "colonySrc": "/static/images/planets/colony/planet-1.png",
         "selectedSrc": "/static/images/planets/selected/planet-1.png",
         "limit": 0.420,
-        "prodPerCapita": 0.100
+        "prodPerCapita": 100
     },
     {
         "name": "Gaya",
@@ -56,7 +56,7 @@
         "normalSrc": "/static/images/planets/normal/planet-5.png",
         "colonySrc": "/static/images/planets/colony/planet-5.png",
         "selectedSrc": "/static/images/planets/selected/planet-5.png",
-        "limit": 0.100,
+        "limit": 2,
         "prodPerCapita": 20000
     },
     {
@@ -68,8 +68,8 @@
         "normalSrc": "/static/images/planets/normal/planet-6.png",
         "colonySrc": "/static/images/planets/colony/planet-6.png",
         "selectedSrc": "/static/images/planets/selected/planet-6.png",
-        "limit": 0.250,
-        "prodPerCapita": 500
+        "limit": 0.690,
+        "prodPerCapita": 800
     },
     {
         "location": {

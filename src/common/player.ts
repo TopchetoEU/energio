@@ -7,6 +7,7 @@ export abstract class player {
     public moving: boolean = false;
     public ownedPlanets: planet[] = [];
     public readonly id: number;
+    public peopleInShip: number = 0;
 
     public constructor(public readonly name: string, id: number, initialLocation?: vector | undefined, direction?: number | undefined) {
         this.id = id;

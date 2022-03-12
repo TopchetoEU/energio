@@ -22,4 +22,7 @@ export enum packetCode {
     OWNPLANET,
     DISOWNPLANET,
     SYNCPLANET,
+    SELECTPLANET,
+    TAKEPPL,
+    LEAVEEPPL,
 }

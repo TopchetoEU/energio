@@ -28,6 +28,7 @@ export class clientPlayer extends player {
         this.imageElement = document.createElement('img');
         this.imageElement.src = '/static/images/player.png';
         this.imageElement.classList.add('movable');
+        this.imageElement.draggable = false;
 
         this.usernameElement = document.createElement('span');
         this.usernameElement.innerText = packet.name;   

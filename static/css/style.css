@@ -38,6 +38,7 @@ input {
     text-align: center;
     color: white;
     margin: 30px 0;
+    pointer-events: all;
 }
 input:focus {
     border-bottom: white 3px solid;
@@ -50,10 +51,16 @@ button {
     font-size: 2em;
     border: 0;
     outline: 0;
+    pointer-events: all;
 }
 button:active {
     background-color: #bbb;
     color: black;
+
+}
+button:disabled {
+    background-color: #333;
+    color: #666;
 
 }
 
@@ -77,6 +84,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .movable {
     transition: 150ms linear;
+}
+
+* {
+    user-select: none;
 }
 
 .planet {
@@ -120,18 +131,70 @@ body, html {
     bottom: 0;
     width: 100%;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     gap: 10px;
     padding-bottom: 10px;
+}
+.energyInfo {
+    width: max-content;
+    max-width: 33%;
 }
 .energyFullBar {
     background-color: #967d0072;
     width: 33%;
     backdrop-filter: blur(10px);
+    height: 20px;
 }
 #energybar {
     background-color: rgb(255, 236, 95);
     height: 100%;
     box-shadow: 0 0 20px 5px rgba(250, 210, 48, 0.871);
     transition: 150ms linear;
+}
+
+.playerInfo, .planetInfo {
+    position: fixed;
+    width: 33%;
+    height: 500px;
+    padding: 20px;
+    background-color: #8882;
+    backdrop-filter: blur(10px);
+    display: block;
+    box-sizing: border-box;
+    font-size: .75em;
+}
+.playerInfo {
+    width: 600px;
+    height: 300px;
+    top: 0;
+    right: 0;
+}
+.planetInfo {
+    bottom: 0;
+    right: 0;
+}
+.field {
+    display: flex;
+    margin: 5px 0;
+    gap: 10px;
+    justify-content: stretch;
+}
+.field input {
+    margin: 0;
+    flex: 1 1 auto;
+}
+.field button {
+    width: 150px;
+}
+
+h2 {
+    text-align: center;
+}
+
+.infoGrid {
+    margin: 20px 0;
+    display: grid;
+    grid-template-columns: max-content auto;
+    gap: 10px;
 }

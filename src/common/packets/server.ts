@@ -52,8 +52,12 @@ export interface ownPlanetPacketData {
 export interface disownPlanetPacketData {
     planetId: number;
 }
+export interface selectPlanetPacketData {
+    planetId?: number;
+}
 
 export interface syncPlanet {
     planetId: number;
     population: number;
+    production: number;
 }

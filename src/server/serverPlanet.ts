@@ -10,7 +10,7 @@ let nextId = 0;
 
 export class serverPlanet extends planet {
     public get production(): number {
-        return this.productionPerCapita * this.population;
+        return this.productionPerCapita * this.population / 1000;
     }
 
     public update(delta: number) {
@@ -28,6 +28,7 @@ export class serverPlanet extends planet {
             await player._connection.sendPacket(packetCode.SYNCPLANET, {
                 planetId: this.id,
                 population: this.population,
+                production: this.production,
             });
         }
     }

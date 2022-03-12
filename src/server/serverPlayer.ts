@@ -26,6 +26,7 @@ export class serverPlayer extends player implements energyUnit {
     private _velocity: vector = vector.zero;
     private _angularVelocity: number = 0;
     private _rotationDirection: rotationDirection = rotationDirection.NONE;
+    public _selectedPlanet?: serverPlanet;
     protected _consumption: number = 0;
     protected _production: number = 0;
     public readonly _connection: packetConnection;
@@ -54,7 +55,7 @@ export class serverPlayer extends player implements energyUnit {
         return this._angularVelocity;
     }
 
-    public sync() {
+    public sync(planets: serverPlanet[]) {
         this._connection.sendPacket(packetCode.SYNCPOS, {
             location: this.location,
             direction: this.direction,
@@ -63,6 +64,36 @@ export class serverPlayer extends player implements energyUnit {
             consumption: this._consumption,
             production: this.production,
         });
+
+        let leastDist = -1;
+        let closestPlanet: serverPlanet | undefined;
+
+        // Finds closest planet
+        for (let planet of planets) {
+            let dist = planet.location.squaredDistance(this.location);
+            if (leastDist < 0 || dist < leastDist) {
+                leastDist = dist;
+                closestPlanet = planet as serverPlanet;
+            }
+        }
+
+        // Deselect if further than 150px
+        if (closestPlanet && leastDist > 150 * 150) {
+            closestPlanet = undefined;
+        }
+
+        // Don't update if same planet is being reselected
+        if (this._selectedPlanet !== closestPlanet) {
+            if (closestPlanet) {
+                this._connection.sendPacket(packetCode.SELECTPLANET, {
+                    planetId: closestPlanet.id,
+                });
+            }
+            else  {
+                this._connection.sendPacket(packetCode.SELECTPLANET, {});
+            }
+        }
+        this._selectedPlanet = closestPlanet;
     }
 
     public async update(delta: number, controller: serverController): Promise<void> {
@@ -70,8 +101,8 @@ export class serverPlayer extends player implements energyUnit {
     
         this._angularVelocity += this._rotationDirection * ANGULAR_SPEED;
 
-        this._production = this.ownedPlanets.reduce((prev, curr) => prev + curr.production, 0) / 1000;
-        this._consumption = this.ownedPlanets.reduce((prev, curr) => prev + curr.consumption, 0) / 1000;
+        this._production = this.ownedPlanets.reduce((prev, curr) => prev + curr.production, 0);
+        this._consumption = this.ownedPlanets.reduce((prev, curr) => prev + curr.consumption, 0);
 
         let move = true;
 

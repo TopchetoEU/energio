@@ -3,7 +3,7 @@ import * as http from "http";
 import { serverPlayer } from "./serverPlayer";
 import { packet, packetConnection } from "../common/packetConnection";
 import { logoffPacketData, packetCode } from "../common/packets";
-import { controlPacketData, controlType, loginPacketData } from "../common/packets/client";
+import { controlPacketData, controlType, leavePplPacketData, loginPacketData, takePplPacketData } from "../common/packets/client";
 import { serverSocket } from "./serverSocket";
 import { connect, first } from "rxjs";
 import { gameConfig, planetConfig } from "./gameConfig";
@@ -45,6 +45,18 @@ export class serverController {
             player._connection.connection.close();
         };
     }
+    private onTakePpl(player: serverPlayer): (packet: packet<takePplPacketData>) => void {
+        return packet => {
+            player.peopleInShip += packet.data.count;
+            (player._selectedPlanet as serverPlanet).population -= packet.data.count / 1000;
+        };
+    }
+    private onLeavePpl(player: serverPlayer): (packet: packet<leavePplPacketData>) => void {
+        return packet => {
+            player.peopleInShip -= packet.data.count;
+            (player._selectedPlanet as serverPlanet).population += packet.data.count / 1000;
+        };
+    }
 
 
     public _players: serverPlayer[] = [];
@@ -61,7 +73,10 @@ export class serverController {
                     newDirection: v.direction,
                 });
             });
-            (v as serverPlayer).sync();
+            (v as serverPlayer).sync(this._planets);
+        });
+        this._planets.forEach(v => {
+            v.sync(this._players);
         });
     }
 
@@ -171,31 +186,28 @@ export class serverController {
     }
 
     private getPlanetLocation() {
-        let loc: vector;
-        let ok = false;
-        let i = 0;
+        let loc: vector = vector.zero;
 
-        do {
+        for (let startLoc of this._planets.map(v => v.location)) {
+            let ok = false;
+
             ok = true;
-            let startLoc = vector.zero;
-            if (this._planets.length > 0)
-                this._planets[Math.floor(Math.random() * this._planets.length)].location;
-            let lloc = vector.fromDirection(Math.random() * 360);
-            lloc = lloc.multiply(Math.random() * 2000);
-            loc = startLoc.add(lloc);
+            let dir = Math.random() * 360;
 
-            i++;
-            if (i > 1000) break;
-
-
-            for (let planet of this._planets) {
-                let dist = planet.location.distance(loc);
-                if (dist < 1000) {
-                    ok = false;
-                    break;
+            for (let i = 0; i < 360; i += 1) {
+                loc = startLoc.add(vector.fromDirection(Math.random() * 1500).multiply(Math.random() * 1500));
+                dir += 1;
+                
+                for (let planet of this._planets) {
+                    let dist = planet.location.distance(loc);
+                    if (dist < 750) {
+                        ok = false;
+                        break;
+                    }
                 }
+                if (ok) return loc;
             }
-        } while(!ok);
+        }
 
         return loc;
     }
@@ -243,12 +255,14 @@ export class serverController {
                     });
 
                     let planet = this.createPlanetFromConf({ ...config.starter, location: loc });
-                    planet.population = planet.limit * (Math.random() * 0.666 + 0.333);
+                    planet.population = planet.limit;
                     await planet.sync(this._players);
                     await this.ownPlanet(planet, player);
 
                     con.onPacket<logoffPacketData>(packetCode.LOGOFF).subscribe(this.onLogoff(player));
                     con.onPacket<controlPacketData>(packetCode.CONTROL).subscribe(this.onControl(player));
+                    con.onPacket<takePplPacketData>(packetCode.TAKEPPL).subscribe(this.onTakePpl(player));
+                    con.onPacket<leavePplPacketData>(packetCode.LEAVEEPPL).subscribe(this.onLeavePpl(player));
                 }
             }
             catch (e: any) {

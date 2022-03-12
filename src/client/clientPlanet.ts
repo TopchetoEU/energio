@@ -1,16 +1,15 @@
 import { newPlanetPacketData, ownPlanetPacketData, syncPlanet as syncPlanetPacketData } from "../common/packets/server";
 import { planet } from "../common/planet";
-import { player } from "../common/player";
 import { vector } from "../common/vector";
-import { clientPlayer } from "./clientPlayer";
 
 export class clientPlanet extends planet {
     public readonly element: HTMLDivElement;
     public readonly imgElement: HTMLImageElement;
     public selected: boolean = false;
+    private _production: number = 0;
 
     public get production(): number {
-        return 0;
+        return this._production;
     }
 
     public updateElement() {
@@ -25,17 +24,20 @@ export class clientPlanet extends planet {
     }
     public sync(packet: syncPlanetPacketData) {
         this.population = packet.population;
+        this._production = packet.production;
         this.updateElement();
     }
 
     constructor(packet: newPlanetPacketData) {
         super(packet.id, packet.prodPerCapita, packet.limit, packet.normalSrc, packet.colonySrc, packet.selectedSrc, packet.name, new vector(packet.location.x, packet.location.y));
 
+
         this.element = document.createElement('div');
         this.element.classList.add('player');
         
         this.imgElement = document.createElement('img');
         this.imgElement.src = packet.colonySrc;
+        this.imgElement.draggable = false;
 
         this.element.appendChild(this.imgElement);
 

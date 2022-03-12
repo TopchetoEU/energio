@@ -12,7 +12,7 @@ export abstract class planet implements energyUnit {
     }
     public abstract get production(): number;
     public get consumption() {
-        return this.limit * this.productionPerCapita / 10;
+        return this.limit * this.productionPerCapita / 3000;
     }
 
     public constructor(
