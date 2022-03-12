@@ -141,7 +141,11 @@ export class clientController extends player implements energyUnit {
     private onSyncMov(packet: syncPosPacketData) {
         this.location = new vector(packet.location.x, packet.location.y);
         this.direction = packet.direction;
+        this.peopleInShip = packet.pplAboard;
+        console.log(packet.pplAboard);
+
         this.updateElements();
+        this.updateInfoElement();
     }
     /**
      * Handles the packet packetCode.SYNCENG.
@@ -155,6 +159,7 @@ export class clientController extends player implements energyUnit {
     }
     private onSyncPlanet(packet: syncPlanetPacketData) {
         let planet = this.getPlanet(packet.planetId);
+        this.updateInfoElement();
         planet?.sync(packet);
     }   
     /**
@@ -252,6 +257,7 @@ export class clientController extends player implements energyUnit {
             }
             planet.owner = undefined;
             planet.updateElement();
+            this.updateInfoElement();
         }
     }
     /**
@@ -346,7 +352,9 @@ export class clientController extends player implements energyUnit {
             let val = this.leavePeopleCountElement.value;
             try {
                 let numVal = Number.parseFloat(val);
-                this.leavePeopleBtnElement.disabled = numVal > this.peopleInShip || numVal > (this.selectedPlanet?.limit ?? 0) - (this.selectedPlanet?.population ?? 0);
+                console.log(numVal, this.peopleInShip);
+                // || numVal > (this.selectedPlanet?.limit ?? 0) - (this.selectedPlanet?.population ?? 0)
+                this.leavePeopleBtnElement.disabled = numVal > this.peopleInShip;
             }
             catch (e) {}
         };

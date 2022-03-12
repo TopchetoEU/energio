@@ -59,6 +59,7 @@ export class serverPlayer extends player implements energyUnit {
         this._connection.sendPacket(packetCode.SYNCPOS, {
             location: this.location,
             direction: this.direction,
+            pplAboard: this.peopleInShip,
         });
         this._connection.sendPacket(packetCode.SYNCENG, {
             consumption: this._consumption,
@@ -125,7 +126,7 @@ export class serverPlayer extends player implements energyUnit {
         if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
         else this.location = this.location.add(this.velocity);
 
-        for (let planet of this.ownedPlanets.filter(v => v.population < 1)) {
+        for (let planet of this.ownedPlanets.filter(v => v.population < 0.001)) {
             await controller.disownPlanet(planet as serverPlanet);
         }
         this.ownedPlanets.forEach(v => {

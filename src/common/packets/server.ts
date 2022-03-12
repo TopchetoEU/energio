@@ -5,6 +5,7 @@ import { vector } from "../vector";
 export interface syncPosPacketData {
     location: point;
     direction: number;
+    pplAboard: number;
 }
 export interface syncEngPacketData {
     production: number;

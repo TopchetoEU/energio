@@ -48,16 +48,18 @@ export class serverController {
     private onTakePpl(player: serverPlayer): (packet: packet<takePplPacketData>) => void {
         return packet => {
             player.peopleInShip += packet.data.count;
-            (player._selectedPlanet as serverPlanet).population -= packet.data.count / 1000;
+            let planet = player._selectedPlanet as serverPlanet;
+            planet.population -= packet.data.count / 1000;
         };
     }
     private onLeavePpl(player: serverPlayer): (packet: packet<leavePplPacketData>) => void {
         return packet => {
             player.peopleInShip -= packet.data.count;
-            (player._selectedPlanet as serverPlanet).population += packet.data.count / 1000;
+            let planet = player._selectedPlanet as serverPlanet;
+            planet.population += packet.data.count / 1000;
+            if (!planet.owner) this.ownPlanet(planet, player);
         };
     }
-
 
     public _players: serverPlayer[] = [];
     public _planets: serverPlanet[] = [];
