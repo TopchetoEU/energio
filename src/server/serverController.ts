@@ -2,15 +2,14 @@ import * as ws from "websocket";
 import * as http from "http";
 import { serverPlayer } from "./serverPlayer";
 import { packet, packetConnection } from "../common/packetConnection";
-import { logoffPacketData, packetCode } from "../common/packets";
-import { controlPacketData, controlType, leavePplPacketData, loginPacketData, takePplPacketData } from "../common/packets/client";
+import { packetCode } from "../common/packets";
+import { controlPacketData, controlType, loginPacketData, logoutPacketData as logoffPacketData, shipControlPacketData } from "../common/packets/client";
 import { serverSocket } from "./serverSocket";
 import { connect, first } from "rxjs";
 import { gameConfig, planetConfig } from "./gameConfig";
 import { vector } from "../common/vector";
 import { serverPlanet } from "./serverPlanet";
 import { player } from "../common/player";
-import { newPlanetPacketData, ownPlanetPacketData } from "../common/packets/server";
 
 interface context {
     connection: ws.connection;
@@ -23,41 +22,45 @@ export class serverController {
     private httpServer: http.Server;
     private wsServer: ws.server;
 
-    private onControl(player: serverPlayer): (packet: packet<controlPacketData>) => void {
+    private onControl(player: serverPlayer): (packet: controlPacketData) => void {
         return packet => {
-            if (packet.data.type === controlType.Forward) player.moving = packet.data.starting;
-            else if (packet.data.starting) {
-                if (packet.data.type === controlType.Left) player.rotationDirection--;
-                else if (packet.data.type === controlType.Right) player.rotationDirection++;
+            if (packet.type === controlType.Forward) player.moving = packet.starting;
+            else if (packet.starting) {
+                if (packet.type === controlType.Left) player.rotationDirection--;
+                else if (packet.type === controlType.Right) player.rotationDirection++;
             }
             else {
-                if (packet.data.type === controlType.Left) player.rotationDirection++;
-                else if (packet.data.type === controlType.Right) player.rotationDirection--;
+                if (packet.type === controlType.Left) player.rotationDirection++;
+                else if (packet.type === controlType.Right) player.rotationDirection--;
             }
 
             if (player.rotationDirection < -1) player.rotationDirection = -1;
             if (player.rotationDirection > 1) player.rotationDirection = 1;
         };
     }
-    private onLogoff(player: serverPlayer): (packet: packet<logoffPacketData>) => void {
+    private onLogoff(player: serverPlayer): (packet: logoffPacketData) => void {
         return () => {
             this.logout(player);
-            player._connection.connection.close();
+            player.connection.connection.close();
         };
     }
-    private onTakePpl(player: serverPlayer): (packet: packet<takePplPacketData>) => void {
+    private onShipControl(player: serverPlayer): (packet: shipControlPacketData) => void {
         return packet => {
-            player.peopleInShip += packet.data.count;
-            let planet = player._selectedPlanet as serverPlanet;
-            planet.population -= packet.data.count / 1000;
-        };
-    }
-    private onLeavePpl(player: serverPlayer): (packet: packet<leavePplPacketData>) => void {
-        return packet => {
-            player.peopleInShip -= packet.data.count;
-            let planet = player._selectedPlanet as serverPlanet;
-            planet.population += packet.data.count / 1000;
-            if (!planet.owner) this.ownPlanet(planet, player);
+            if (packet.count <= 0) return;
+            if (!player._selectedPlanet) return;
+
+            if (packet.leave) {
+                if (player._selectedPlanet.owner && player._selectedPlanet.owner !== player) {
+                    player.connection.sendError("Players may be left only at owned colonies or non-colonized planets.");
+                    return;
+                }
+
+                let limit = player._selectedPlanet.limit - player._selectedPlanet.population;
+                if (player.peopleAboard > limit) player.peopleAboard = limit;
+
+                player._selectedPlanet.population += 
+            }
+            // if (player._selectedPlanet.population < packet.count) packet.count = player._selectedPlanet.population;
         };
     }
 
@@ -69,7 +72,7 @@ export class serverController {
             (v as serverPlayer).update(delta, this);
             this._players.forEach(other => {
                 if (other.id === v.id) return;
-                (other as serverPlayer)._connection.sendPacket(packetCode.MOVE, {
+                (other as serverPlayer).connection.sendPacket(packetCode.MOVE, {
                     playerId: v.id,
                     newLocation: v.location,
                     newDirection: v.direction,
@@ -84,7 +87,7 @@ export class serverController {
 
     private createPlanetFromConf(conf: planetConfig): serverPlanet {
         let planet = new serverPlanet(conf);
-        this._players.forEach(v => (v as serverPlayer)._connection.sendPacket(packetCode.NEWPLANET, { ...conf, id: planet.id }));
+        this._players.forEach(v => (v as serverPlayer).connection.sendPacket(packetCode.NEWPLANET, { ...conf, id: planet.id }));
         this._planets.push(planet);
         return planet;
     }
@@ -98,7 +101,7 @@ export class serverController {
             this.disownPlanet(planet);
         }
         for (let v of this._players) {
-            await v._connection.sendPacket(packetCode.OWNPLANET, { 
+            await v.connection.sendPacket(packetCode., { 
                 playerId: player.id,
                 planetId: planet.id
             });
@@ -109,7 +112,7 @@ export class serverController {
     public async disownPlanet(planet: serverPlanet): Promise<void> {
         if (!planet.owner) return;
         for (let v of this._players) {
-            await v._connection.sendPacket(packetCode.DISOWNPLANET, { 
+            await v.connection.sendPacket(packetCode.DISOWNPLANET, { 
                 planetId: planet.id
             });
         }
@@ -123,20 +126,20 @@ export class serverController {
         
         const player = new serverPlayer(name, connection, location, direction);
 
-        await player._connection.sendPacket(packetCode.INIT, {
+        await player.connection.sendPacket(packetCode.INIT, {
             location: location,
             rotation: direction,
             selfId: player.id,
         });
 
         for (let _player of this._players) {
-            await player._connection.sendPacket(packetCode.NEWPLAYER, {
+            await player.connection.sendPacket(packetCode.NEWPLAYER, {
                 playerId: _player.id,
                 name: _player.name,
                 location: _player.location,
                 direction: _player.direction,
             });
-            await _player._connection.sendPacket(packetCode.NEWPLAYER, {
+            await _player.connection.sendPacket(packetCode.NEWPLAYER, {
                 playerId: player.id,
                 name: player.name,
                 location: player.location,
@@ -145,7 +148,7 @@ export class serverController {
         }
 
         for (let planet of this._planets) {
-            await player._connection.sendPacket(packetCode.NEWPLANET, {
+            await player.connection.sendPacket(packetCode.NEWPLANET, {
                 colonySrc: planet.colonySrc,
                 normalSrc: planet.normalSrc,
                 selectedSrc: planet.selectedSrc,
@@ -156,7 +159,7 @@ export class serverController {
                 location: planet.location,
             });
             if (planet.owner) {
-                await player._connection.sendPacket(packetCode.OWNPLANET, {
+                await player.connection.sendPacket(packetCode.OWNPLANET, {
                     planetId: planet.id,
                     playerId: planet.owner.id,
                 });
@@ -175,12 +178,12 @@ export class serverController {
         for (let planet of player.ownedPlanets) {
             await this.disownPlanet(planet as serverPlanet);
         }
-        this._players.forEach(v => (v as serverPlayer)._connection.sendPacket(packetCode.DELPLAYER, {
+        this._players.forEach(v => (v as serverPlayer).connection.sendPacket(packetCode.DELPLAYER, {
             playerId: player.id,
         }));
-        if (!player._connection.connection.closed) {
-            if (reason) await player._connection.sendPacket(packetCode.KICK, { message: reason });
-            player._connection.close();
+        if (!player.connection.connection.closed) {
+            if (reason) await player.connection.sendPacket(packetCode.KICK, { message: reason });
+            player.connection.close();
         }
     }
     public getPlayer(id: number): player | null {
@@ -263,8 +266,7 @@ export class serverController {
 
                     con.onPacket<logoffPacketData>(packetCode.LOGOFF).subscribe(this.onLogoff(player));
                     con.onPacket<controlPacketData>(packetCode.CONTROL).subscribe(this.onControl(player));
-                    con.onPacket<takePplPacketData>(packetCode.TAKEPPL).subscribe(this.onTakePpl(player));
-                    con.onPacket<leavePplPacketData>(packetCode.LEAVEEPPL).subscribe(this.onLeavePpl(player));
+                    con.onPacket<shipControlPacketData>(packetCode.SHIPCONTROL).subscribe(this.onShipControl(player));
                 }
             }
             catch (e: any) {

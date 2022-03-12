@@ -6,6 +6,7 @@ import { serverPlanet } from "./serverPlanet";
 import { energyUnit } from "./energy";
 import { serverController } from "./serverController";
 import { HighlightSpanKind } from "typescript";
+import { property } from "../common/props/property";
 
 export const SPEED = 100;
 export const DRAG = -.8;
@@ -23,13 +24,15 @@ export type packetHandle<T> = (player: serverPlayer, packet: packet<T>) => void;
 let nextId = 1;
 
 export class serverPlayer extends player implements energyUnit {
+    public velocity: property()
+
     private _velocity: vector = vector.zero;
     private _angularVelocity: number = 0;
     private _rotationDirection: rotationDirection = rotationDirection.NONE;
     public _selectedPlanet?: serverPlanet;
     protected _consumption: number = 0;
     protected _production: number = 0;
-    public readonly _connection: packetConnection;
+    public readonly connection: packetConnection;
 
     public get balance(): number {
         return this.production - this.consumption;
@@ -56,12 +59,12 @@ export class serverPlayer extends player implements energyUnit {
     }
 
     public sync(planets: serverPlanet[]) {
-        this._connection.sendPacket(packetCode.SYNCPOS, {
+        this.connection.sendPacket(packetCode.SYNCPOS, {
             location: this.location,
             direction: this.direction,
-            pplAboard: this.peopleInShip,
+            pplAboard: this.peopleAboard,
         });
-        this._connection.sendPacket(packetCode.SYNCENG, {
+        this.connection.sendPacket(packetCode.SYNCENG, {
             consumption: this._consumption,
             production: this.production,
         });
@@ -86,12 +89,12 @@ export class serverPlayer extends player implements energyUnit {
         // Don't update if same planet is being reselected
         if (this._selectedPlanet !== closestPlanet) {
             if (closestPlanet) {
-                this._connection.sendPacket(packetCode.SELECTPLANET, {
+                this.connection.sendPacket(packetCode.SELECTPLANET, {
                     planetId: closestPlanet.id,
                 });
             }
             else  {
-                this._connection.sendPacket(packetCode.SELECTPLANET, {});
+                this.connection.sendPacket(packetCode.SELECTPLANET, {});
             }
         }
         this._selectedPlanet = closestPlanet;
@@ -136,6 +139,6 @@ export class serverPlayer extends player implements energyUnit {
 
     public constructor(name: string, connection: packetConnection, location?: vector, direction?: number) {
         super(name, nextId++, location, direction);
-        this._connection = connection;
+        this.connection = connection;
     }
 }
