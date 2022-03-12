@@ -31,7 +31,6 @@ export class clientPlanet extends planet {
     constructor(packet: newPlanetPacketData) {
         super(packet.id, packet.prodPerCapita, packet.limit, packet.normalSrc, packet.colonySrc, packet.selectedSrc, packet.name, new vector(packet.location.x, packet.location.y));
 
-
         this.element = document.createElement('div');
         this.element.classList.add('player');
         

@@ -9,6 +9,8 @@ import { vector } from "../common/vector";
 import { energyUnit } from "../server/energy";
 import { clientPlanet } from "./clientPlanet";
 import { clientPlayer } from "./clientPlayer";
+import { resources } from "./resources";
+import { transformStack } from "./transformStack";
 
 const TIMEOUT = 2000;
 const onKeydown = fromEvent<KeyboardEvent>(document, 'keydown');
@@ -20,36 +22,34 @@ export class clientController extends player implements energyUnit {
     private subscribers: Subscription[] = [];
     private players: clientPlayer[] = [];
     private planets: clientPlanet[] = [];
-    private ownPlanets: clientPlanet[] = [];
     private selectedPlanet: clientPlanet | null = null;
 
     private _consumption: number = 0;
     private _production: number = 0;
 
-    private gameElement = document.getElementById('game') as HTMLDivElement;
-    private playerElement = document.getElementById('self') as HTMLDivElement;
-    private percentElement = document.getElementById('engpercent') as HTMLSpanElement;
-    private energyBarElement = document.getElementById('energybar') as HTMLDivElement;
-
-    private planetInfoElement = document.getElementById('planetinfo') as HTMLDivElement;
-    private planetPropsElement = document.getElementById('planetprops') as HTMLDivElement;
-    private playerPropsElement = document.getElementById('playerprops') as HTMLDivElement;
-
-    private takePeopleElement = document.getElementById('planetTakePeople') as HTMLDivElement;
-    private takePeopleCountElement = document.getElementById('takepeoplecount') as HTMLInputElement;
-    private takePeopleBtnElement = document.getElementById('takepeoplebtn') as HTMLButtonElement;
-
-    private leavePeopleElement = document.getElementById('planetleavepeople') as HTMLDivElement;
-    private leavePeopleCountElement = document.getElementById('leavepeoplecount') as HTMLInputElement;
-    private leavePeopleBtnElement = document.getElementById('leavepeoplebtn') as HTMLButtonElement;
+    private canvasElement = document.getElementById('game') as HTMLCanvasElement;
+    private canvas = this.canvasElement.getContext('2d') as CanvasRenderingContext2D;
 
     /**
      * Updates transformation of player and game
      */
-    private updateElements() {
-        // Updates transformations to match player's location and direction
-        this.gameElement.style.transform = `rotate(${-this.direction}deg) translate(${-this.location.x}px, ${-this.location.y}px)`;
-        this.playerElement.style.transform = `translate(${this.location.x}px, ${this.location.y}px) rotate(${this.direction}deg)`;
+    private async redraw(tickDelta: number) {
+        let stack = new transformStack(this.canvas);
+        stack.begin();
+
+        stack.translate(new vector(this.canvasElement.width / 2, this.canvasElement.height / 2));
+
+        stack.translate(this.location.invert());
+        stack.rotate(-this.direction);
+
+        for (let player of this.players) {
+            await player.draw(this.canvas, stack, tickDelta);
+        }
+
+        this.canvas.drawImage(await resources.getImage('/static/images/rocket.png'), 0, 0);
+
+        stack.end();
+        stack.end();
     }
     /**
      * Updates energy indicators
@@ -144,7 +144,7 @@ export class clientController extends player implements energyUnit {
         this.peopleInShip = packet.pplAboard;
         console.log(packet.pplAboard);
 
-        this.updateElements();
+        this.redraw();
         this.updateInfoElement();
     }
     /**

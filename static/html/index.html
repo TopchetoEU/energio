@@ -9,19 +9,15 @@
     <script src="/static/js/bundle.js" defer></script>
     <link rel="stylesheet" href="/static/css/style.css">
 <body>
-    <div id="game" class="game movable">
-        <div id="background">
-        </div>
-        <div id="self" class="player movable">
-            <img src="/static/images/player.png" draggable="false">
-        </div>
-    </div>
-    <div id="overlay">
-        <div id="form">
+    <canvas id="game" class="game">
+        Your browser isn't supported :(
+    </canvas>
+    <div id="modal" class="overlay">
+        <div id="form" class="form">
             <h1>Energ.io</h1>
             <h3>Input a username and play!</h3>
             <input type="text" id="username" spellcheck="false">
-            <button id="playbtn">Play!</button>
+            <button id="playbtn">Play</button>
         </div>
     </div>
     <div id="gui">
