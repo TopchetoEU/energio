@@ -39,13 +39,13 @@ export class clientController extends player implements energyUnit {
     private updateBarElements() {
         let percent: number;
 
-        if (this.production === 0) percent = 0;
+        if (this.production === 0) percent = 1;
         else {
             percent = 1 - this.consumption / this.production;
             if (percent < 0) percent = 0;
         }
 
-        let newText = `${percent * 100}% / ${this.production}PW`;
+        let newText = `${(percent * 100).toFixed(2)}% / ${this.production.toFixed(2)}TW`;
         if (this.percentElement.innerText != newText) this.percentElement.innerText = newText;
         this.energyBarElement.style.width = `${percent * 100}%`;
     }
@@ -137,8 +137,6 @@ export class clientController extends player implements energyUnit {
     }
     private onDisownPlanet(data: disownPlanetPacketData): void {
         let planet = this.getPlanet(data.planetId);
-
-        console.log(planet);
 
         if (planet) {
             if (planet.owner === this) {

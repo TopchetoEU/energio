@@ -243,7 +243,7 @@ export class serverController {
                     });
 
                     let planet = this.createPlanetFromConf({ ...config.starter, location: loc });
-                    planet.population = Math.random() * planet.limit;
+                    planet.population = planet.limit * (Math.random() * 0.666 + 0.333);
                     await planet.sync(this._players);
                     await this.ownPlanet(planet, player);
 

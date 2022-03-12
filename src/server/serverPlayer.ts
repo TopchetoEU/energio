@@ -5,6 +5,7 @@ import { packetCode } from "../common/packets";
 import { serverPlanet } from "./serverPlanet";
 import { energyUnit } from "./energy";
 import { serverController } from "./serverController";
+import { HighlightSpanKind } from "typescript";
 
 export const SPEED = 100;
 export const DRAG = -.8;
@@ -69,11 +70,24 @@ export class serverPlayer extends player implements energyUnit {
     
         this._angularVelocity += this._rotationDirection * ANGULAR_SPEED;
 
+        this._production = this.ownedPlanets.reduce((prev, curr) => prev + curr.production, 0) / 1000;
+        this._consumption = this.ownedPlanets.reduce((prev, curr) => prev + curr.consumption, 0) / 1000;
+
+        let move = true;
+
+        if (this.moving) {
+            this._consumption += 1;
+            if (this._consumption > this.production) {
+                move = false;
+                this._consumption -= 1;
+            }
+        }
+    
         if (Math.abs(this._angularVelocity) < EPSILON) this._angularVelocity = 0;
         else this.direction += this.angularVelocity * delta;
         this._angularVelocity *= ExtMath.drag(ANGULAR_DRAG, delta);
 
-        if (this.moving)
+        if (this.moving && move)
             this._velocity = this._velocity.add(vector.fromDirection(this.direction, false).multiply(SPEED * delta));
         this._velocity = this._velocity.drag(DRAG, delta);
 
@@ -86,8 +100,6 @@ export class serverPlayer extends player implements energyUnit {
         this.ownedPlanets.forEach(v => {
             (v as serverPlanet).update(delta);
         });
-        this._production = this.ownedPlanets.reduce((prev, curr) => prev + curr.production, 0) / 1000;
-        this._consumption = this.ownedPlanets.reduce((prev, curr) => prev + curr.consumption, 0) / 1000;
     }
 
     public constructor(name: string, connection: packetConnection, location?: vector, direction?: number) {
