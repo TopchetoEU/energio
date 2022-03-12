@@ -25,7 +25,7 @@ export class serverPlanet extends planet {
     }
     public async sync(players: serverPlayer[]): Promise<void> {
         for (let player of players) {
-            await player._connection.sendPacket(packetCode.SYNCPLANET, {
+            await player.connection.sendPacket(packetCode.SYNCPLANET, {
                 planetId: this.id,
                 population: this.population,
                 production: this.production,

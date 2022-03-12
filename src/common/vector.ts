@@ -1,4 +1,5 @@
 import { point } from "./packets";
+import { translator } from "./props/changeTracker";
 
 export const EPSILON = 0.0001;
 
@@ -115,6 +116,11 @@ export class vector {
         );
     }
 
+    public equals(other: vector) {
+        return ExtMath.numEquals(this.x, other.x) &&
+               ExtMath.numEquals(this.y, other.y);
+    }
+
     constructor(x: number, y: number) {
         this.x = x;
         this.y = y;
@@ -131,4 +137,9 @@ export class vector {
     public static fromPoint(point: point): vector {
         return new vector(point.x, point.y);
     }
+
+    public static readonly pointTranslator: translator<vector, point> = {
+        translateFrom: v => vector.fromPoint(v),
+        translateTo: v => v
+    };
 }

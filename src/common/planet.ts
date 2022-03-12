@@ -1,18 +1,20 @@
 import { energyUnit } from "../server/energy";
 import { player } from "./player";
+import { objectChangeTracker, trackableObject } from "./props/changeTracker";
+import { valueProperty } from "./props/property";
 import { vector } from "./vector";
 
-export abstract class planet implements energyUnit {
+export abstract class planet implements energyUnit, trackableObject {
     public readonly location: vector;
-    public owner?: player;
+    public owner = new valueProperty<player | undefined>(undefined);
     public population: number = 0;
+    public production = new valueProperty(0);
+    public consumption = new valueProperty(0);
 
-    public get balance(): number {
-        return this.production - this.consumption;
-    }
-    public abstract get production(): number;
-    public get consumption() {
-        return this.limit * this.productionPerCapita / 3000;
+    public readonly creationData;
+
+    get tracker(): objectChangeTracker {
+        throw new Error("Method not implemented.");
     }
 
     public constructor(
@@ -26,5 +28,19 @@ export abstract class planet implements energyUnit {
         initLocation: vector
     ) {
         this.location = initLocation;
+        this.creationData = {
+            id: this.id,
+            name: this.name,
+            limit: this.limit,
+            normalSrc: this.normalSrc,
+            colonySrc: this.colonySrc,
+            selectedSrc: this.selectedSrc,
+            productionPerCapita: this.productionPerCapita,
+            location: this.location,
+        };
     }
+}
+
+export interface planetOwner {
+    get planets(): planet[];
 }

@@ -1,28 +1,6 @@
 import { point } from "../packets";
+import { objectChangeDescriptor } from "../props/changeTracker";
 
-/**
- * A packet that is sent by the server when an error occurs
- */
-export interface errorPacketData {
-    /**
-     * The general human-readable description of the error
-     */
-    err: string;
-    /**
-     * A more in-depth explanation of the error
-     */
-    details?: string;
-}
-/**
- * A packet, sent by the server as a response to
- * a login request
- */
-export interface initPacketData {
-    /**
-     * The ID with which the client's player will be identified
-     */
-    selfId: number;
-}
 
 /**
  * An enum of all possible kick reasons
@@ -35,120 +13,13 @@ export enum kickReason {
 }
 
 /**
- * Initialization data for a newly created player
+ * Data, describing a difference in two players
  */
-export interface playerCreateData {
-    /**
-     * The location of the player
-     */
-    location: point;
-    /**
-     * The direction of the player
-     */
-    direction: number;
-    /**
-     * The name of the player
-     */
-    name: string;
-    /**
-     * The id of the player
-     */
-    id: number;
-
-    /**
-     * The production rate of the player
-     */
-    production: number;
-
-    /**
-     * The consumption rate of the player
-     */
-    consumption: number;
-
-
-    /**
-     * The amount of people on the player's spaceship
-     */
-    pplAboard: number;
-}
+export type playerData = objectChangeDescriptor; 
 /**
- * Initialization data for a newly created planet
+ * Data, describing a difference in two planets
  */
-export interface planetCreateData {
-    population: number;
-    name: string;
-    ownerId?: number | null;
-
-    location: point;
-    limit: number;
-    prodPerCapita: number;
-}
-
-/**
- * Data, used to update a player on the client-side.
- * Sent by the server
- */
-export interface playerUpdateData {
-    /**
-    * The new location for this player. undefined if
-    * the location hasn't changed
-    */
-    location?: point;
-    /**
-    * The new direction of this player. undefined if
-    * it hasn't changed
-    */
-    direction?: number;
-
-    /**
-    * The new production rate of this player. undefined if
-    * it hasn't changed
-    */
-    production?: number;
-    /**
-    * The new consumption rate of this player. undefined if
-    * it hasn't changed
-    */
-    consumption?: number;
-
-    /**
-    * The new amount of people aboard the player's ship. undefined if
-    * it hasn't changed
-    */
-    pplAboard?: number;
-
-    /**
-     * An array of all the planet's IDs, that were added to the
-     * player's owned planets since last tick
-     */
-    ownedPlanetIds: number[];
-    /**
-     * An array of all the planet's IDs, that were removed from the
-     * player's owned planets since last tick
-     */
-    disownedPlanetIds: number[];
-}
-/**
- * Data, used to update a planet on the client-side.
- * Sent by the server
- */
-export interface planetUpdateData {
-    /**
-     * The new location for this planet. undefined if
-     * the location hasn't changed
-     */
-    location?: point;
-    /**
-     * The new population for the planet. undefined if
-     * it hasn't changed
-     */
-    population?: number;
-    /**
-     * The new owner for the planet. undefined if it
-     * hasn't changed. -1 if the planet was disowned
-     */
-    ownerId?: number | -1;
-}
+export type planetData = objectChangeDescriptor;
 
 
 /**
@@ -161,24 +32,24 @@ export interface tickPacketData {
      * An array, containing all changes, that were made to all
      * visible players since the last tick
      */
-    updatedPlayers: { [id: number]: playerUpdateData };
+    updatedPlayers: { [id: number]: playerData };
     /**
      * An array, containing all changes, that were made to all
      * visible planets since the last tick
      */
-    updatedPlanets: { [id: number]: planetUpdateData };
+    updatedPlanets: { [id: number]: planetData };
     /**
      * An array, containing initialization data for all
      * players, that were created since the last tick, or
      * entered view distance
      */
-    newPlayers: playerCreateData[];
+    newPlayers: playerData[];
     /**
      * An array, containing initialization data for all
      * planets, that were created since the last tick, or
      * entered view distance
      */
-    newPlanets: planetCreateData[];
+    newPlanets: planetData[];
     /**
      * An array, containing the IDs of all players, that
      * were removed since the last tick, or exited view
@@ -218,4 +89,15 @@ export interface kickPacketData {
      * undefined if no reason was specified
      */
     message?: string;
+}
+
+/**
+ * A packet, sent by the server as a response to
+ * a login request
+ */
+ export interface initPacketData {
+    /**
+     * The ID with which the client's player will be identified
+     */
+    selfId: number;
 }
