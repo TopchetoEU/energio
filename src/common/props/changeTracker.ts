@@ -1,5 +1,5 @@
 import { Subscription } from "rxjs";
-import { disposable } from "../decommissionable";
+import { disposable } from "../disposable";
 import { arrayProperty, valueProperty } from "./property";
 
 // Indeed, I build an entire framework so I can clean up my code for

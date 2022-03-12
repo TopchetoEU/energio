@@ -6,7 +6,7 @@ import { delPlanetPacketData, delPlayerPacketData, disownPlanetPacketData, initP
 import { player } from "../common/player";
 import { socket } from "../common/socket";
 import { vector } from "../common/vector";
-import { energyUnit } from "../server/energy";
+import { energyUnit } from "../common/energy";
 import { clientPlanet } from "./clientPlanet";
 import { clientPlayer } from "./clientPlayer";
 import { resources } from "./resources";

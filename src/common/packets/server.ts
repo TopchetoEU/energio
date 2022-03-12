@@ -13,13 +13,53 @@ export enum kickReason {
 }
 
 /**
- * Data, describing a difference in two players
+ * Initialization data for a newly created player
  */
-export type playerData = objectChangeDescriptor; 
+export interface playerCreateData {
+    /**
+     * The location of the player
+     */
+    location: point;
+    /**
+     * The direction of the player
+     */
+    direction: number;
+    /**
+     * The name of the player
+     */
+    name: string;
+    /**
+     * The id of the player
+     */
+    id: number;
+}
 /**
- * Data, describing a difference in two planets
+ * Initialization data for a newly created planet
  */
-export type planetData = objectChangeDescriptor;
+export interface planetCreateData {
+    id: number;
+    name: string;
+    limit: number;
+
+    normalSrc: string;
+    colonySrc: string;
+    selectedSrc: string;
+
+    productionPerCapita: number;
+
+    location: point;
+}
+
+/**
+ * Data, used to update a player on the client-side.
+ * Sent by the server
+ */
+export type playerUpdateData = objectChangeDescriptor; 
+/**
+ * Data, used to update a planet on the client-side.
+ * Sent by the server
+ */
+export type planetUpdateData = objectChangeDescriptor;
 
 
 /**
@@ -32,24 +72,24 @@ export interface tickPacketData {
      * An array, containing all changes, that were made to all
      * visible players since the last tick
      */
-    updatedPlayers: { [id: number]: playerData };
+    updatedPlayers: { [id: number]: playerUpdateData };
     /**
      * An array, containing all changes, that were made to all
      * visible planets since the last tick
      */
-    updatedPlanets: { [id: number]: planetData };
+    updatedPlanets: { [id: number]: planetUpdateData };
     /**
      * An array, containing initialization data for all
      * players, that were created since the last tick, or
      * entered view distance
      */
-    newPlayers: playerData[];
+    newPlayers: playerCreateData[];
     /**
      * An array, containing initialization data for all
      * planets, that were created since the last tick, or
      * entered view distance
      */
-    newPlanets: planetData[];
+    newPlanets: planetCreateData[];
     /**
      * An array, containing the IDs of all players, that
      * were removed since the last tick, or exited view

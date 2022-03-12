@@ -3,10 +3,12 @@ import { vector, EPSILON, ExtMath } from "../common/vector";
 import { packet, packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
 import { serverPlanet } from "./serverPlanet";
-import { energyUnit } from "./energy";
+import { energyUnit } from "../common/energy";
 import { serverController } from "./serverController";
 import { HighlightSpanKind } from "typescript";
 import { property } from "../common/props/property";
+import { planet, planetsOwner } from "../common/planet";
+import { merge, Subscriber, Subscription } from "rxjs";
 
 export const SPEED = 100;
 export const DRAG = -.8;
@@ -24,32 +26,13 @@ export type packetHandle<T> = (player: serverPlayer, packet: packet<T>) => void;
 let nextId = 1;
 
 export class serverPlayer extends player implements energyUnit {
-    public velocity: property()
+    public readonly connection: packetConnection;
+
+    public rotationDirection: rotationDirection = rotationDirection.NONE;
 
     private _velocity: vector = vector.zero;
     private _angularVelocity: number = 0;
-    private _rotationDirection: rotationDirection = rotationDirection.NONE;
-    public _selectedPlanet?: serverPlanet;
-    protected _consumption: number = 0;
-    protected _production: number = 0;
-    public readonly connection: packetConnection;
-
-    public get balance(): number {
-        return this.production - this.consumption;
-    }
-    public get production(): number {
-        return this._production;
-    }
-    public get consumption(): number {
-        return this._consumption;
-    }
-
-    public get rotationDirection() {
-        return this._rotationDirection;
-    }
-    public set rotationDirection(val: rotationDirection) {
-        this._rotationDirection = val;
-    }
+    private _subscribers: { [planet: number]: Subscription } = {};
 
     public get velocity() {
         return this._velocity;
@@ -58,23 +41,33 @@ export class serverPlayer extends player implements energyUnit {
         return this._angularVelocity;
     }
 
-    public sync(planets: serverPlanet[]) {
-        this.connection.sendPacket(packetCode.SYNCPOS, {
-            location: this.location,
-            direction: this.direction,
-            pplAboard: this.peopleAboard,
-        });
-        this.connection.sendPacket(packetCode.SYNCENG, {
-            consumption: this._consumption,
-            production: this.production,
-        });
+    private updatePos(delta: number) {
+        this._angularVelocity += this.rotationDirection * ANGULAR_SPEED;
 
+        this.tryConsume(1, () => {
+            this._velocity = this._velocity.add(vector.fromDirection(this.direction.value).multiply(SPEED * delta));
+        });
+    
+        if (Math.abs(this._angularVelocity) < EPSILON) this._angularVelocity = 0;
+        else this.direction.value += this.angularVelocity * delta;
+        this._angularVelocity *= ExtMath.drag(ANGULAR_DRAG, delta);
+        this._velocity = this._velocity.drag(DRAG, delta);
+
+        if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
+        else this.location.value = this.location.value.add(this.velocity);
+    }
+    private updateStats(planets: planet[]) {
+        this.production.value = planets.reduce((prev, curr) => prev + curr.production.value, 0);
+        this.consumption.value = planets.reduce((prev, curr) => prev + curr.consumption.value, 0);
+    }
+    private updateSelection(location: vector) {
         let leastDist = -1;
+
         let closestPlanet: serverPlanet | undefined;
 
         // Finds closest planet
-        for (let planet of planets) {
-            let dist = planet.location.squaredDistance(this.location);
+        for (let planet of this.planetOwner.planets.value) {
+            let dist = planet.location.squaredDistance(this.location.value);
             if (leastDist < 0 || dist < leastDist) {
                 leastDist = dist;
                 closestPlanet = planet as serverPlanet;
@@ -86,59 +79,26 @@ export class serverPlayer extends player implements energyUnit {
             closestPlanet = undefined;
         }
 
-        // Don't update if same planet is being reselected
-        if (this._selectedPlanet !== closestPlanet) {
-            if (closestPlanet) {
-                this.connection.sendPacket(packetCode.SELECTPLANET, {
-                    planetId: closestPlanet.id,
-                });
-            }
-            else  {
-                this.connection.sendPacket(packetCode.SELECTPLANET, {});
-            }
-        }
-        this._selectedPlanet = closestPlanet;
+        this.selectedPlanet.value = closestPlanet;
     }
 
-    public async update(delta: number, controller: serverController): Promise<void> {
+    public update(delta: number) {
         if (delta <= EPSILON) return;
-    
-        this._angularVelocity += this._rotationDirection * ANGULAR_SPEED;
 
-        this._production = this.ownedPlanets.reduce((prev, curr) => prev + curr.production, 0);
-        this._consumption = this.ownedPlanets.reduce((prev, curr) => prev + curr.consumption, 0);
-
-        let move = true;
-
-        if (this.moving) {
-            this._consumption += 1;
-            if (this._consumption > this.production) {
-                move = false;
-                this._consumption -= 1;
-            }
-        }
-    
-        if (Math.abs(this._angularVelocity) < EPSILON) this._angularVelocity = 0;
-        else this.direction += this.angularVelocity * delta;
-        this._angularVelocity *= ExtMath.drag(ANGULAR_DRAG, delta);
-
-        if (this.moving && move)
-            this._velocity = this._velocity.add(vector.fromDirection(this.direction, false).multiply(SPEED * delta));
-        this._velocity = this._velocity.drag(DRAG, delta);
-
-        if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
-        else this.location = this.location.add(this.velocity);
-
-        for (let planet of this.ownedPlanets.filter(v => v.population < 0.001)) {
-            await controller.disownPlanet(planet as serverPlanet);
-        }
-        this.ownedPlanets.forEach(v => {
-            (v as serverPlanet).update(delta);
-        });
+        this.updatePos(delta);
     }
 
-    public constructor(name: string, connection: packetConnection, location?: vector, direction?: number) {
-        super(name, nextId++, location, direction);
+    public constructor(planetsOwner: planetsOwner, name: string, connection: packetConnection, location?: vector, direction?: number) {
+        super(planetsOwner, name, nextId++, location, direction);
         this.connection = connection;
+
+        this.ownedPlanets.onChange.subscribe(this.updateStats);
+        this.ownedPlanets.onAdd.subscribe(v => {
+            this._subscribers[v.id] = merge(v.consumption.onChange, v.production.onChange).subscribe(() => this.updateStats(this.ownedPlanets.value));
+        });
+        this.ownedPlanets.onRemove.subscribe(v => {
+            delete this._subscribers[v.id];
+        });
+        this.location.onChange.subscribe(this.updateSelection);
     }
 }

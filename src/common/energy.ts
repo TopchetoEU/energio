@@ -1,4 +1,4 @@
-import { valueProperty } from "../common/props/property";
+import { valueProperty } from "./props/property";
 
 export interface energyConsumer {
     consumption: valueProperty<number>;

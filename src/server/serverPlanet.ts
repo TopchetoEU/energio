@@ -1,39 +1,35 @@
 import { packetCode } from "../common/packets";
-import { syncPlanet } from "../common/packets/server";
-import { planet } from "../common/planet";
+import { planetCreateData } from "../common/packets/server";
+import { planet, planetsOwner } from "../common/planet";
+import { playersOwner } from "../common/player";
 import { ExtMath, vector } from "../common/vector";
 import { planetConfig } from "./gameConfig";
 import { serverPlayer } from "./serverPlayer";
 
-export const GROWTH_RATE = 0.01;
+export const GROWTH_RATE = 0.005;
 let nextId = 0;
 
 export class serverPlanet extends planet {
-    public get production(): number {
-        return this.productionPerCapita * this.population / 1000;
-    }
-
     public update(delta: number) {
         if (this.owner) {
-            this.population *= ExtMath.drag(GROWTH_RATE, delta);
-            if (this.population > this.limit) this.population = this.limit;
+            this.population.value *= ExtMath.drag(GROWTH_RATE, delta);
+            this.production.value = this.productionPerCapita * this.population.value / 1000;
+            if (this.population.value > this.limit) this.population.value = this.limit;
         }
         else {
-            this.population = 0;
-            this.owner = undefined;
-        }
-    }
-    public async sync(players: serverPlayer[]): Promise<void> {
-        for (let player of players) {
-            await player.connection.sendPacket(packetCode.SYNCPLANET, {
-                planetId: this.id,
-                population: this.population,
-                production: this.production,
-            });
+            this.population.value = 0;
         }
     }
 
-    constructor(config: planetConfig) {
-        super(++nextId, config.prodPerCapita, config.limit, config.normalSrc, config.colonySrc, config.selectedSrc, config.name, new vector(config.location.x, config.location.y));
+    constructor(config: planetConfig, playersOwner: playersOwner) {
+        super(playersOwner, ++nextId, config.prodPerCapita, config.limit, config.normalSrc, config.colonySrc, config.selectedSrc, config.name, new vector(config.location.x, config.location.y));
+        this.population.onChange.subscribe(v => {
+            this.productionPerCapita * v / 1000;
+            if (v < 0.0001) this.owner.value = undefined;
+        });
+        this.owner.onChange.subscribe(v => {
+            this.owner?.value?.ownedPlanets.remove(this);
+            v?.ownedPlanets.add(this);
+        });
     }
 }
