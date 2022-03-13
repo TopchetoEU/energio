@@ -7,7 +7,7 @@ import { vector } from "./vector";
 export abstract class planet implements energyUnit {
     public readonly location: vector;
 
-    public owner = new valueProperty<player | undefined>(undefined, (a, b) => a?.id === b?.id);
+    public owner = new valueProperty<player | undefined>(undefined, (a, b) => (a?.id ?? -1) === (b?.id ?? -1));
     public population = new valueProperty(0);
     public production = new valueProperty(0);
     public consumption = new valueProperty(0);

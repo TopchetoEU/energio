@@ -21,14 +21,13 @@ export class clientPlayer extends player {
     };
 
     public readonly applier = new objectChangeApplier()
-        .prop('ownedPlanets', true, this.planetTranslator)
+        // .prop('ownedPlanets', true, this.planetTranslator)
         .prop('peopleAboard')
         .prop('location', false, vector.pointTranslator)
         .prop('direction')
         .prop('moving')
         .prop('production')
-        .prop('consumption')
-        .prop('selectedPlanet', false, this.planetTranslator);
+        .prop('consumption');
 
     private get rocketImg(): string {
         return '/static/images/player.png';

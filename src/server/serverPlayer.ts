@@ -43,6 +43,8 @@ export class serverPlayer extends player implements energyUnit, trackableObject 
 
     public rotationDirection: rotationDirection = rotationDirection.NONE;
 
+    private actuallyWalking = false;
+
     private _velocity: vector = vector.zero;
     private _angularVelocity: number = 0;
     private _subscribers: { [planet: number]: Subscription } = {};
@@ -57,12 +59,10 @@ export class serverPlayer extends player implements energyUnit, trackableObject 
     private updatePos(delta: number) {
         this._angularVelocity += this.rotationDirection * ANGULAR_SPEED;
 
-        if (this.moving.value) {
-            // this.tryConsume(1, () => {
-                this._velocity = this._velocity.add(vector.fromDirection(this.direction.value).multiply(SPEED * delta));
-            // });
+        if (this.moving.value && this.actuallyWalking) {
+            this._velocity = this._velocity.add(vector.fromDirection(this.direction.value).multiply(SPEED * delta));
         }
-        
+
         if (Math.abs(this._angularVelocity) < EPSILON) this._angularVelocity = 0;
         else this.direction.value += this.angularVelocity * delta;
         
@@ -74,8 +74,8 @@ export class serverPlayer extends player implements energyUnit, trackableObject 
         this._velocity = this._velocity.drag(DRAG, delta);
     }
     private updateStats(planets: planet[]) {
-        // this.production.value = planets.reduce((prev, curr) => prev + curr.production.value, 0);
-        // this.consumption.value = planets.reduce((prev, curr) => prev + curr.consumption.value, 0);
+        this.production.value = this.ownedPlanets.value.reduce((prev, curr) => prev + curr.production.value, 0);
+        this.consumption.value = this.ownedPlanets.value.reduce((prev, curr) => prev + curr.consumption.value, 0) + (this.actuallyWalking ? 1 : 0);
     }
     private updateSelection(location: vector) {
         let leastDist = -1;
@@ -111,9 +111,9 @@ export class serverPlayer extends player implements energyUnit, trackableObject 
 
         this.connection = connection;
 
-        this.ownedPlanets.onChange.subscribe(this.updateStats);
+        this.ownedPlanets.onChange.subscribe(v => this.updateStats(v));
         this.ownedPlanets.onAdd.subscribe(v => {
-            this._subscribers[v.id] = merge(v.consumption.onChange, v.production.onChange).subscribe(() => this.updateStats(this.ownedPlanets.value));
+            this._subscribers[v.id] = merge(v.production.onChange).subscribe(() => this.updateStats(this.ownedPlanets.value));
         });
         this.ownedPlanets.onRemove.subscribe(v => {
             delete this._subscribers[v.id];
@@ -129,11 +129,14 @@ export class serverPlayer extends player implements energyUnit, trackableObject 
             name: name
         }
 
+        this.moving.onChange.subscribe(v => {
+            this.actuallyWalking = this.consumption.value + 1 < this.production.value;
+            this.updateStats(planetsOwner.planets.value);
+        })
+
         this.tracker = new objectChangeTracker(this)
-            .prop('ownedPlanets', true, this.planetTranslator)
             .prop('peopleAboard')
             .prop('location', false, vector.pointTranslator)
-            .prop('selectedPlanet', false, this.planetTranslator)
             .prop('direction')
             .prop('moving')
             .prop('production')

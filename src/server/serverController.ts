@@ -70,12 +70,17 @@ export class serverController implements playersOwner, planetsOwner {
 
                 planet.population.value += packet.count;
                 player.peopleAboard.value -= packet.count;
+
+                planet.owner.value = player;
             }
             else {
                 packet.count = Math.min(planet.population.value, packet.count);
                 
                 planet.population.value -= packet.count;
                 player.peopleAboard.value += packet.count;
+
+                if (planet.population.value < 0.000001) 
+                    planet.owner.value = undefined;
             }
         };
     }
@@ -176,12 +181,12 @@ export class serverController implements playersOwner, planetsOwner {
             let dir = Math.random() * 360;
 
             for (let i = 0; i < 360; i += 1) {
-                loc = startLoc.add(vector.fromDirection(Math.random() * 1500).multiply(Math.random() * 500));
+                loc = startLoc.add(vector.fromDirection(Math.random() * 1500).multiply(Math.random() * 1500));
                 dir += 1;
                 
                 for (let planet of this.planets.value) {
                     let dist = planet.location.distance(loc);
-                    if (dist < 100) {
+                    if (dist < 750) {
                         ok = false;
                         break;
                     }

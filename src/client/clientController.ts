@@ -1,7 +1,7 @@
 import { fromEvent, Subscription } from "rxjs";
 import { packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
-import { controlType } from "../common/packets/client";
+import { controlType, shipControlPacketData } from "../common/packets/client";
 import { initPacketData, kickPacketData, tickPacketData } from "../common/packets/server";
 import { player } from "../common/player";
 import { socket } from "../common/socket";
@@ -26,8 +26,25 @@ export async function drawImage(canvas: CanvasRenderingContext2D, src: string) {
 }
 
 export class clientController extends player implements energyUnit {
-    public readonly players;
-    public readonly planets;
+    public readonly players = new arrayProperty<player>();
+    public readonly planets = new arrayProperty<planet>();
+
+    private gameElement = document.getElementById('game') as HTMLDivElement;
+    private playerElement = document.getElementById('self') as HTMLDivElement;
+    private percentElement = document.getElementById('engpercent') as HTMLSpanElement;
+    private energyBarElement = document.getElementById('energybar') as HTMLDivElement;
+
+    private planetInfoElement = document.getElementById('planetinfo') as HTMLDivElement;
+    private planetPropsElement = document.getElementById('planetprops') as HTMLDivElement;
+    private playerPropsElement = document.getElementById('playerprops') as HTMLDivElement;
+
+    private takePeopleElement = document.getElementById('planetTakePeople') as HTMLDivElement;
+    private peopleCountElement = document.getElementById('peoplecount') as HTMLInputElement;
+    private takePeopleBtnElement = document.getElementById('takepeoplebtn') as HTMLButtonElement;
+    private leavePeopleBtnElement = document.getElementById('leavepeoplebtn') as HTMLButtonElement;
+
+    private readonly _players = new arrayProperty<player>();
+
     public readonly planetTranslator: translator<number, planet> = {
         translateFrom: v => v.id,
         translateTo: v => {
@@ -38,7 +55,6 @@ export class clientController extends player implements energyUnit {
     };
 
     public readonly applier = new objectChangeApplier()
-        .prop('ownedPlanets', true, this.planetTranslator)
         .prop('peopleAboard')
         .prop('location', false, vector.pointTranslator)
         .prop('direction')
@@ -60,21 +76,13 @@ export class clientController extends player implements energyUnit {
     private onTick(data: tickPacketData): void {
         this._delta = data.delta;
         this.planets.removeIf(planet => data.deletedPlanets.includes(planet.id));
-        this.players.removeIf(player => data.deletedPlayers.includes(player.id));
+        this._players.removeIf(player => data.deletedPlayers.includes(player.id));
 
         this.planets.add(...data.newPlanets.map(v => new clientPlanet(this, v)));
-        this.players.add(...data.newPlayers.filter(v => v.id !== this.id).map(v => new clientPlayer(this, v)));
+        this._players.add(...data.newPlayers.filter(v => v.id !== this.id).map(v => new clientPlayer(this, v)));
 
         this.selectedPlanet.value = this.getPlanet(data.selectedPlanetId);
 
-        for (let el of data.updatedPlanets) {
-            let changeDesc = el.changes;
-            let planet = (this.getPlanet(el.id) as clientPlanet | undefined);
-            if (planet) {
-                let applier = planet.applier;
-                applier.applyChanges(changeDesc, planet);
-            }
-        }
         for (let el of data.updatedPlayers) {
             let changeDesc = el.changes;
             let player = (this.getPlayer(el.id) as clientPlayer | undefined);
@@ -85,7 +93,18 @@ export class clientController extends player implements energyUnit {
                 applier.applyChanges(changeDesc, player);
             }
         }
+        for (let el of data.updatedPlanets) {
+            let changeDesc = el.changes;
+            let planet = (this.getPlanet(el.id) as clientPlanet | undefined);
+            if (planet) {
+                let applier = planet.applier;
+                applier.applyChanges(changeDesc, planet);
+                if (changeDesc.owner !== void 0) planet.owner.value = this.getPlayer(changeDesc.owner);
+            }
+        }
 
+        this.updateInfoElement();
+        this.updateBarElements();
         this.lastTickTime = performance.now();
     }
     private onKick(data: kickPacketData): void {
@@ -126,11 +145,11 @@ export class clientController extends player implements energyUnit {
         stack.rotate(-lerpedDir);
         stack.translate(lerpedLoc.invert());
 
-        for (let player of this.players.value) {
+        for (let player of this._players.value) {
             await (player as clientPlayer).draw(canvas, stack, lerpedDir, tickDelta);
         }
         for (let planet of this.planets.value) {
-            await (planet as clientPlanet).draw(this.selectedPlanet.value === planet, canvas, stack);
+            await (planet as clientPlanet).draw(this.selectedPlanet.value?.id === planet.id, canvas, stack);
         }
 
         stack.end();
@@ -140,64 +159,58 @@ export class clientController extends player implements energyUnit {
         canvasEl.remove();
         this._canvas.drawImage(canvasEl, 0, 0);
     }
-    // /**
-    //  * Updates energy indicators
-    //  */
-    // private updateBarElements() {
-    //     let percent: number;
+    /**
+     * Updates energy indicators
+     */
+    private updateBarElements() {
+        let percent: number;
 
-    //     if (this.production === 0) percent = 1;
-    //     else {
-    //         percent = 1 - this.consumption / this.production;
-    //         if (percent < 0) percent = 0;
-    //     }
-    //     // Gets how much of the energy is being consumed
+        if (this.production.value === 0) percent = 1;
+        else {
+            percent = 1 - this.consumption.value / this.production.value;
+            if (percent < 0) percent = 0;
+        }
+        // Gets how much of the energy is being consumed
 
-    //     // Updates the text, only if its different, to avoid DOM lag
-    //     let newText = `${this.consumption.toFixed(2)}TW / ${this.production.toFixed(2)}TW`;
-    //     if (this.percentElement.innerText != newText) this.percentElement.innerText = newText;
+        // Updates the text, only if its different, to avoid DOM lag
+        let newText = `${this.consumption.value.toFixed(2)}TW / ${this.production.value.toFixed(2)}TW`;
+        if (this.percentElement.innerText != newText) this.percentElement.innerText = newText;
 
-    //     // Updates the bar
-    //     this.energyBarElement.style.width = `${percent * 100}%`;
-    // }
-    // private createProperty(name: string, ...values: any[]): HTMLSpanElement[] {
-    //     let nameElement = document.createElement('span');
-    //     nameElement.innerText = name;
-    //     let valueElement = document.createElement('span');
-    //     valueElement.innerText = values.join('');
+        // Updates the bar
+        this.energyBarElement.style.width = `${percent * 100}%`;
+    }
+    private createProperty(name: string, ...values: any[]): HTMLSpanElement[] {
+        let nameElement = document.createElement('span');
+        nameElement.innerText = name;
+        let valueElement = document.createElement('span');
+        valueElement.innerText = values.join('');
 
-    //     return [ nameElement, valueElement ];
-    // }
-    // private updateInfoElement() {
-    //     if (this.selectedPlanet) {
-    //         this.planetInfoElement.style.removeProperty('display');
-    //         this.planetPlayersPropsElement.append(...this.createProperty("Limit", this.selectedPlanet.limit, " billion people"));
-    //         this.planetPropsElement.append(...this.createProperty("Watt/Capita", this.selectedPlanet.productionPerCapita, "W"));
-    //         this.planetPropsElement.append(...this.createProperty("Max production", (this.selectedPlanet.limit * this.selectedPlanet.productionPerCapita / 1000).toFixed(2), "TW"));
+        return [ nameElement, valueElement ];
+    }
+    private updateInfoElement() {
+        if (this.selectedPlanet.value) {
+            this.planetInfoElement.style.removeProperty('display');
+            this.planetPropsElement.innerHTML = '';
+            this.planetPropsElement.append(...this.createProperty("Limit", this.selectedPlanet.value.limit, " billion people"));
+            this.planetPropsElement.append(...this.createProperty("Watt/Capita", this.selectedPlanet.value.productionPerCapita, "W"));
+            this.planetPropsElement.append(...this.createProperty("Max production", (this.selectedPlanet.value.limit * this.selectedPlanet.value.productionPerCapita / 1000).toFixed(2), "TW"));
 
-    //         if (this.selectedPlanet.owner) {
-    //             this.planetPropsElement.append(...this.createProperty("Owner", this.selectedPlanet.owner.name));
-    //             this.planetPropsElement.append(...this.createProperty("Population", this.selectedPlanet.population.toFixed(2), " billion people"));
-    //             this.planetPropsElement.append(...this.createProperty("Production", this.selectedPlanet.production.toFixed(2), "TW"));
-    //         }
-    //         this.planetPropsElement.append(...this.createProperty("Consumption", this.selectedPlanet.consumption.toFixed(2), "TW"));
+            if (this.selectedPlanet.value.owner.value) {
+                this.planetPropsElement.append(...this.createProperty("Owner", this.selectedPlanet.value.owner.value.name));
+                this.planetPropsElement.append(...this.createProperty("Population", this.selectedPlanet.value.population.value.toFixed(2), " billion people"));
+                this.planetPropsElement.append(...this.createProperty("Production", this.selectedPlanet.value.production.value.toFixed(2), "TW"));
+            }
+            this.planetPropsElement.append(...this.createProperty("Consumption", this.selectedPlanet.value.consumption.value.toFixed(2), "TW"));
+        }
+        else {
+            this.planetInfoElement.style.display = "none";
+        }
 
-    //         if (this.selectedPlanet.owner === this) {
-    //             this.takePeopleElement.style.removeProperty('display');
-    //         }
-    //         else {
-    //             this.takePeopleElement.style.display = 'none';
-    //         }
-    //     }
-    //     else {
-    //         this.planetInfoElement.style.display = "none";
-    //     }
-
-    //     this.playerPropsElement.innerHTML = '';
-    //     this.playerPropsElement.append(...this.createProperty("Name", this.name));
-    //     this.playerPropsElement.append(...this.createProperty("People aboard", this.peopleAboard));
-    //     // this.peopleInShip 
-    // }
+        this.playerPropsElement.innerHTML = '';
+        this.playerPropsElement.append(...this.createProperty("Name", this.name));
+        this.playerPropsElement.append(...this.createProperty("People aboard", this.peopleAboard.value));
+        // this.peopleInShip 
+    }
     /**
      * Processes a key press
      * @param code The key code to account for
@@ -225,7 +238,7 @@ export class clientController extends player implements energyUnit {
      * @returns Player that was found
      */
     private getPlayer(id: number) {
-        if (id === this.id) return this;
+        // if (id === this.id) return this;
         return this.players.value.find(v => v.id === id);
     }
     /**
@@ -249,11 +262,16 @@ export class clientController extends player implements energyUnit {
      * @param name The name of the self player
      */
     public constructor(packet: initPacketData, connection: packetConnection, name: string) {
-        let players = new arrayProperty<player>();
-        let planets = new arrayProperty<planet>();
-        super({ planets }, name, packet.selfId, new vector(0, 0), 0);
-        this.players = players;
-        this.planets = planets;
+        let _planets = new arrayProperty<planet>();
+        super({ planets: _planets }, name, packet.selfId, new vector(0, 0), 0);
+
+        this.planets = _planets;
+        this._players.onAdd.subscribe
+
+        this.players.add(this);
+        this._players.onAdd.subscribe(v => this.players.add(v));
+        this._players.onRemove.subscribe(v => this.players.remove(v));
+
         this._connection = connection;
 
         this._subscribers.push(
@@ -270,6 +288,19 @@ export class clientController extends player implements energyUnit {
 
         this.prevDirection = this.direction.value;
         this.prevLocation = this.location.value;
+
+        this.leavePeopleBtnElement.onclick = () => {
+            this._connection.sendPacket(packetCode.SHIPCONTROL, {
+                count: Number.parseInt(this.peopleCountElement.value),
+                leave: true,
+            } as shipControlPacketData);
+        };
+        this.takePeopleBtnElement.onclick = () => {
+            this._connection.sendPacket(packetCode.SHIPCONTROL, {
+                count: Number.parseInt(this.peopleCountElement.value),
+                leave: false,
+            } as shipControlPacketData);
+        };
 
         requestAnimationFrame(this.frame.bind(this));
     }

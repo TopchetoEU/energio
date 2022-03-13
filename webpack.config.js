@@ -2,12 +2,13 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const _path = require('path');
 
 module.exports = {
-    mode: "development",
+    mode: "production",
     entry: "./build/client/entry.js",
     output: {
         path: _path.resolve(__dirname, 'static/js'),
         filename: 'bundle.js',
         publicPath: '/static/js',
+        sourceMapFilename: _path.resolve(__dirname, 'static/js/sourcemap.js'),
         // library: {
         //     type: "umd",
         //     name: "shooter-lib",

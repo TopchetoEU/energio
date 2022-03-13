@@ -8,11 +8,17 @@ import { transformStack } from "./transformStack";
 
 export class clientPlanet extends planet {
     public selected: boolean = false;
+    public readonly idTranslator: translator<number, player | undefined> = {
+        translateFrom: v => v?.id ?? -1,
+        translateTo: v => {
+            // if (v < 0) return undefined;
+            let res = this.playersOwner.players.value.find(_v => _v.id === v);
+            if (res) return res;
+            else throw new Error("Invalid planet given.");
+        },
+    };
     public readonly applier = new objectChangeApplier()
-        .prop('owner', false, {
-            translateTo: id => id === -1 ? undefined : this.playersOwner.players.value.find(v => v.id === id),
-            translateFrom: player => player ? player.id : -1,
-        } as translator<number, player | undefined>)
+        .prop('owner', false, this.idTranslator)
         .prop('population')
         .prop('production')
         .prop('consumption');
@@ -37,8 +43,6 @@ export class clientPlanet extends planet {
 
         stack.begin();
 
-        console.log(src);
-
         stack.translate(this.location);
         await drawImage(context, src);
 
@@ -54,5 +58,6 @@ export class clientPlanet extends planet {
             packet.name,
             new vector(packet.location.x, packet.location.y)
         );
+        // this.consumption = 
     }
 }

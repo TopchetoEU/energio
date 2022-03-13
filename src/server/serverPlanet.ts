@@ -20,7 +20,9 @@ export class serverPlanet extends planet implements trackableObject {
             if (res) return res;
             else throw new Error("Invalid planet given.");
         },
-        translateTo: v => v?.id ?? -1,
+        translateTo: v => {
+            return v?.id ?? -1;
+        }
     };
 
     public update(delta: number) {
@@ -36,6 +38,7 @@ export class serverPlanet extends planet implements trackableObject {
 
     constructor(config: planetConfig, playersOwner: playersOwner) {
         super(playersOwner, ++nextId, config.prodPerCapita, config.limit, config.normalSrc, config.colonySrc, config.selectedSrc, config.name, new vector(config.location.x, config.location.y));
+        this.consumption.value = this.limit * this.productionPerCapita / 3000;
         this.population.onChange.subscribe(v => {
             this.productionPerCapita * v / 1000;
             if (v < 0.0001) this.owner.value = undefined;
