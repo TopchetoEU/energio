@@ -1,11 +1,12 @@
+import { valueProperty } from "./props/property";
+
 export interface energyConsumer {
-    get consumption(): number;
+    consumption: valueProperty<number>;
 }
 
 export interface energyProducer {
-    get production(): number;
+    production: valueProperty<number>;
 }
 
 export interface energyUnit extends energyProducer, energyConsumer {
-    get balance(): number;
 }

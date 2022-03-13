@@ -1,0 +1,65 @@
+h1, h2, h3, h4, h5, h6 {
+    padding: 0;
+    margin: 0;
+}
+
+@font-face {
+    font-family: majormonodisplay;
+    src: url(/static/HeadHuman.otf);
+}
+
+html, body {
+    padding: 0;
+    margin: 0;
+    border: 0;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+    color: white;
+    font-family: majormonodisplay;
+    font-size: 1.25em;
+}
+
+input {
+    background-color: transparent;
+    border: 0;
+    outline: 0;
+    padding-bottom: 3px;
+    margin: 0;
+    border-bottom: white 1px solid;
+    font-size: 1.5em;
+    text-align: center;
+    color: inherit;
+    box-sizing: border-box;
+    outline: 0;
+    font-family: inherit;
+
+    &:focus {
+        border-bottom: white 3px solid;
+        margin-bottom: -1px;
+    }
+}
+
+button {
+    background-color: #8884;
+    color: inherit;
+    font-size: 2em;
+    border: 0;
+    padding: 0;
+    outline: 0;
+    font-family: inherit;
+    padding: 0 .5rem;
+    box-sizing: content-box;
+
+    transition: 100ms ease-in-out;
+
+    &:active {
+        background-color: #bbb;
+        color: black;
+    
+    }
+    &:disabled {
+        background-color: #333;
+        color: #666;
+    }
+}

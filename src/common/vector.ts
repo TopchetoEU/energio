@@ -1,3 +1,6 @@
+import { point } from "./packets";
+import { translator } from "./props/changeTracker";
+
 export const EPSILON = 0.0001;
 
 export const ExtMath = {
@@ -7,6 +10,9 @@ export const ExtMath = {
     numEquals(a: number, b: number) {
         const diff = a - b;
         return diff > -EPSILON && diff < EPSILON;
+    },
+    lerp(src: number, dest: number, gradient: number) {
+        return src * (1 - gradient) + dest * gradient;
     }
 }
 
@@ -103,6 +109,18 @@ export class vector {
         return Math.abs(vec.x) + Math.abs(vec.y) < viewDist;
     }
 
+    public lerp(dest: vector, gradient: number) {
+        return new vector(
+            ExtMath.lerp(this.x, dest.x, gradient),
+            ExtMath.lerp(this.y, dest.y, gradient),
+        );
+    }
+
+    public equals(other: vector) {
+        return ExtMath.numEquals(this.x, other.x) &&
+               ExtMath.numEquals(this.y, other.y);
+    }
+
     constructor(x: number, y: number) {
         this.x = x;
         this.y = y;
@@ -116,4 +134,12 @@ export class vector {
 
         return new vector(x, -y);
     }
+    public static fromPoint(point: point): vector {
+        return new vector(point.x, point.y);
+    }
+
+    public static readonly pointTranslator: translator<vector, point> = {
+        translateFrom: v => vector.fromPoint(v),
+        translateTo: v => v
+    };
 }

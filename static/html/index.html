@@ -9,20 +9,10 @@
     <script src="/static/js/bundle.js" defer></script>
     <link rel="stylesheet" href="/static/css/style.css">
 <body>
-    <div id="game" class="game movable">
-        <div id="background">
-        </div>
-        <div id="self" class="player movable">
-            <img src="/static/images/player.png" draggable="false">
-        </div>
-    </div>
-    <div id="overlay">
-        <div id="form">
-            <h1>Energ.io</h1>
-            <h3>Input a username and play!</h3>
-            <input type="text" id="username" spellcheck="false">
-            <button id="playbtn">Play!</button>
-        </div>
+    <div class="game">
+        <canvas id="game">
+            Your browser isn't supported :(
+        </canvas>
     </div>
     <div id="gui">
         <div class="energyContainer">
@@ -38,12 +28,9 @@
             <h2>Planet info:</h2>
             <div class="infoGrid" id="planetprops">
             </div>
-            <div id="planetTakePeople" class="field">
-                <input placeholder="Count (in millions)" type="number" id="takepeoplecount">
+            <input placeholder="Count (in millions)" type="number" id="peoplecount">
+            <div id="planetPeople" class="field">
                 <button id="takepeoplebtn">Take</button>
-            </div>
-            <div id="planetleavepeople" class="field">
-                <input placeholder="Count (in millions)" type="number" id="leavepeoplecount">
                 <button id="leavepeoplebtn">Leave</button>
             </div>
         </div>
@@ -51,6 +38,14 @@
             <h2>Player info:</h2>
             <div class="infoGrid" id="playerprops">
             </div>
+        </div>
+    </div>
+    <div id="modal" class="overlay">
+        <div id="form" class="form">
+            <h1>Energ.io</h1>
+            <h3>Input a username and play!</h3>
+            <input type="text" id="username" spellcheck="false">
+            <button id="playbtn">Play</button>
         </div>
     </div>
 </body>

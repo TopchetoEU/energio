@@ -4,8 +4,17 @@ import { vector } from "../common/vector";
 import { clientController } from "./clientController";
 import { clientSocket } from "./clientSocket";
 
-const overlayEl = document.getElementById('overlay') as HTMLElement;
+const overlayEl = document.getElementById('modal') as HTMLElement;
 const guiEl = document.getElementById('gui') as HTMLElement;
+const canvasEl = document.getElementById('game') as HTMLCanvasElement;
+
+canvasEl.width = window.innerWidth;
+canvasEl.height = window.innerHeight;
+
+window.onresize = e => {
+    canvasEl.width = window.innerWidth;
+    canvasEl.height = window.innerHeight;
+}
 
 (document.getElementById('playbtn') as HTMLElement).onclick = () => {
     let ws = new WebSocket('ws://77.70.55.157:8001');

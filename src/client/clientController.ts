@@ -1,30 +1,33 @@
 import { fromEvent, Subscription } from "rxjs";
 import { packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
-import { controlType } from "../common/packets/client";
-import { delPlanetPacketData, delPlayerPacketData, disownPlanetPacketData, initPacketData, movePacketData, newPlanetPacketData, newPlayerPacketData, ownPlanetPacketData, selectPlanetPacketData, syncEngPacketData, syncPlanet as syncPlanetPacketData, syncPosPacketData } from "../common/packets/server";
+import { controlType, shipControlPacketData } from "../common/packets/client";
+import { initPacketData, kickPacketData, tickPacketData } from "../common/packets/server";
 import { player } from "../common/player";
 import { socket } from "../common/socket";
-import { vector } from "../common/vector";
-import { energyUnit } from "../server/energy";
-import { clientPlanet } from "./clientPlanet";
+import { ExtMath, vector } from "../common/vector";
+import { energyUnit } from "../common/energy";
+import { resources } from "./resources";
+import { transformStack } from "./transformStack";
+import { arrayProperty } from "../common/props/property";
+import { planet } from "../common/planet";
 import { clientPlayer } from "./clientPlayer";
+import { clientPlanet } from "./clientPlanet";
+import { objectChangeApplier, translator } from "../common/props/changeTracker";
 
 const TIMEOUT = 2000;
 const onKeydown = fromEvent<KeyboardEvent>(document, 'keydown');
 const onKeyup = fromEvent<KeyboardEvent>(document, 'keyup');
 const SCALE = 1;
 
-export class clientController extends player implements energyUnit {
-    private _connection: packetConnection;
-    private subscribers: Subscription[] = [];
-    private players: clientPlayer[] = [];
-    private planets: clientPlanet[] = [];
-    private ownPlanets: clientPlanet[] = [];
-    private selectedPlanet: clientPlanet | null = null;
+export async function drawImage(canvas: CanvasRenderingContext2D, src: string) {
+    let a = await resources.getImage(src);
+    canvas.drawImage(a, -a.width / 2, -a.height / 2);
+}
 
-    private _consumption: number = 0;
-    private _production: number = 0;
+export class clientController extends player implements energyUnit {
+    public readonly players = new arrayProperty<player>();
+    public readonly planets = new arrayProperty<planet>();
 
     private gameElement = document.getElementById('game') as HTMLDivElement;
     private playerElement = document.getElementById('self') as HTMLDivElement;
@@ -36,20 +39,125 @@ export class clientController extends player implements energyUnit {
     private playerPropsElement = document.getElementById('playerprops') as HTMLDivElement;
 
     private takePeopleElement = document.getElementById('planetTakePeople') as HTMLDivElement;
-    private takePeopleCountElement = document.getElementById('takepeoplecount') as HTMLInputElement;
+    private peopleCountElement = document.getElementById('peoplecount') as HTMLInputElement;
     private takePeopleBtnElement = document.getElementById('takepeoplebtn') as HTMLButtonElement;
-
-    private leavePeopleElement = document.getElementById('planetleavepeople') as HTMLDivElement;
-    private leavePeopleCountElement = document.getElementById('leavepeoplecount') as HTMLInputElement;
     private leavePeopleBtnElement = document.getElementById('leavepeoplebtn') as HTMLButtonElement;
+
+    private readonly _players = new arrayProperty<player>();
+
+    public readonly planetTranslator: translator<number, planet> = {
+        translateFrom: v => v.id,
+        translateTo: v => {
+            let res = this.planetOwner.planets.value.find(_v => _v.id === v);
+            if (res) return res;
+            else throw new Error("Invalid planet given.");
+        },
+    };
+
+    public readonly applier = new objectChangeApplier()
+        .prop('peopleAboard')
+        .prop('location', false, vector.pointTranslator)
+        .prop('direction')
+        .prop('moving')
+        .prop('production')
+        .prop('consumption');
+
+    private _connection: packetConnection;
+    private _subscribers: Subscription[] = [];
+    private _delta: number = 0;
+    public prevLocation: vector;
+    public prevDirection: number;
+
+    private _canvasElement = document.getElementById('game') as HTMLCanvasElement;
+    private _canvas = this._canvasElement.getContext('2d') as CanvasRenderingContext2D;
+
+    private lastTickTime: number = 0;
+
+    private onTick(data: tickPacketData): void {
+        this._delta = data.delta;
+        this.planets.removeIf(planet => data.deletedPlanets.includes(planet.id));
+        this._players.removeIf(player => data.deletedPlayers.includes(player.id));
+
+        this.planets.add(...data.newPlanets.map(v => new clientPlanet(this, v)));
+        this._players.add(...data.newPlayers.filter(v => v.id !== this.id).map(v => new clientPlayer(this, v)));
+
+        this.selectedPlanet.value = this.getPlanet(data.selectedPlanetId);
+
+        for (let el of data.updatedPlayers) {
+            let changeDesc = el.changes;
+            let player = (this.getPlayer(el.id) as clientPlayer | undefined);
+            if (player) {
+                let applier = player.applier;
+                player.prevLocation = player.location.value;
+                player.prevDirection = player.direction.value;
+                applier.applyChanges(changeDesc, player);
+            }
+        }
+        for (let el of data.updatedPlanets) {
+            let changeDesc = el.changes;
+            let planet = (this.getPlanet(el.id) as clientPlanet | undefined);
+            if (planet) {
+                let applier = planet.applier;
+                applier.applyChanges(changeDesc, planet);
+                if (changeDesc.owner !== void 0) planet.owner.value = this.getPlayer(changeDesc.owner);
+            }
+        }
+
+        this.updateInfoElement();
+        this.updateBarElements();
+        this.lastTickTime = performance.now();
+    }
+    private onKick(data: kickPacketData): void {
+        throw new Error("Method not implemented.");
+    }
+
+
+    private async drawSelf(canvas: CanvasRenderingContext2D, stack: transformStack) {
+        stack.begin();
+        stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
+
+        // stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
+        await drawImage(canvas, '/static/images/player.png');
+
+        stack.end();
+    }
 
     /**
      * Updates transformation of player and game
      */
-    private updateElements() {
-        // Updates transformations to match player's location and direction
-        this.gameElement.style.transform = `rotate(${-this.direction}deg) translate(${-this.location.x}px, ${-this.location.y}px)`;
-        this.playerElement.style.transform = `translate(${this.location.x}px, ${this.location.y}px) rotate(${this.direction}deg)`;
+    private async redraw(tickDelta: number) {
+        let canvasEl = document.createElement('canvas');
+        canvasEl.width = this._canvasElement.width;
+        canvasEl.height = this._canvasElement.height;
+        let canvas = canvasEl.getContext('2d') as CanvasRenderingContext2D;
+
+        canvas.fillStyle = '#000';
+        canvas.fillRect(0, 0, this._canvasElement.width, this._canvasElement.height);
+
+        let stack = new transformStack(canvas);
+        // stack.transformOrigin = new vector(this._canvasElement.width / 2, this._canvasElement.height / 2);
+        stack.begin();
+        
+        let lerpedDir = ExtMath.lerp(this.prevDirection, this.direction.value, tickDelta);
+        let lerpedLoc = this.prevLocation.lerp(this.location.value, tickDelta);
+    
+        stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
+        stack.rotate(-lerpedDir);
+        stack.translate(lerpedLoc.invert());
+
+        for (let player of this._players.value) {
+            await (player as clientPlayer).draw(canvas, stack, lerpedDir, tickDelta);
+        }
+        for (let planet of this.planets.value) {
+            await (planet as clientPlanet).draw(this.selectedPlanet.value?.id === planet.id, canvas, stack);
+        }
+
+        stack.end();
+
+        await this.drawSelf(canvas, stack);
+
+        canvasEl.remove();
+        this._canvas.drawImage(canvasEl, 0, 0);
     }
     /**
      * Updates energy indicators
@@ -57,15 +165,15 @@ export class clientController extends player implements energyUnit {
     private updateBarElements() {
         let percent: number;
 
-        if (this.production === 0) percent = 1;
+        if (this.production.value === 0) percent = 1;
         else {
-            percent = 1 - this.consumption / this.production;
+            percent = 1 - this.consumption.value / this.production.value;
             if (percent < 0) percent = 0;
         }
         // Gets how much of the energy is being consumed
 
         // Updates the text, only if its different, to avoid DOM lag
-        let newText = `${this.consumption.toFixed(2)}TW / ${this.production.toFixed(2)}TW`;
+        let newText = `${this.consumption.value.toFixed(2)}TW / ${this.production.value.toFixed(2)}TW`;
         if (this.percentElement.innerText != newText) this.percentElement.innerText = newText;
 
         // Updates the bar
@@ -80,28 +188,19 @@ export class clientController extends player implements energyUnit {
         return [ nameElement, valueElement ];
     }
     private updateInfoElement() {
-        if (this.selectedPlanet) {
+        if (this.selectedPlanet.value) {
             this.planetInfoElement.style.removeProperty('display');
             this.planetPropsElement.innerHTML = '';
+            this.planetPropsElement.append(...this.createProperty("Limit", this.selectedPlanet.value.limit, " billion people"));
+            this.planetPropsElement.append(...this.createProperty("Watt/Capita", this.selectedPlanet.value.productionPerCapita, "W"));
+            this.planetPropsElement.append(...this.createProperty("Max production", (this.selectedPlanet.value.limit * this.selectedPlanet.value.productionPerCapita / 1000).toFixed(2), "TW"));
 
-            this.planetPropsElement.append(...this.createProperty("Name", this.selectedPlanet.name));
-            this.planetPropsElement.append(...this.createProperty("Limit", this.selectedPlanet.limit, " billion people"));
-            this.planetPropsElement.append(...this.createProperty("Watt/Capita", this.selectedPlanet.productionPerCapita, "W"));
-            this.planetPropsElement.append(...this.createProperty("Max production", (this.selectedPlanet.limit * this.selectedPlanet.productionPerCapita / 1000).toFixed(2), "TW"));
-
-            if (this.selectedPlanet.owner) {
-                this.planetPropsElement.append(...this.createProperty("Owner", this.selectedPlanet.owner.name));
-                this.planetPropsElement.append(...this.createProperty("Population", this.selectedPlanet.population.toFixed(2), " billion people"));
-                this.planetPropsElement.append(...this.createProperty("Production", this.selectedPlanet.production.toFixed(2), "TW"));
+            if (this.selectedPlanet.value.owner.value) {
+                this.planetPropsElement.append(...this.createProperty("Owner", this.selectedPlanet.value.owner.value.name));
+                this.planetPropsElement.append(...this.createProperty("Population", this.selectedPlanet.value.population.value.toFixed(2), " billion people"));
+                this.planetPropsElement.append(...this.createProperty("Production", this.selectedPlanet.value.production.value.toFixed(2), "TW"));
             }
-            this.planetPropsElement.append(...this.createProperty("Consumption", this.selectedPlanet.consumption.toFixed(2), "TW"));
-
-            if (this.selectedPlanet.owner === this) {
-                this.takePeopleElement.style.removeProperty('display');
-            }
-            else {
-                this.takePeopleElement.style.display = 'none';
-            }
+            this.planetPropsElement.append(...this.createProperty("Consumption", this.selectedPlanet.value.consumption.value.toFixed(2), "TW"));
         }
         else {
             this.planetInfoElement.style.display = "none";
@@ -109,7 +208,7 @@ export class clientController extends player implements energyUnit {
 
         this.playerPropsElement.innerHTML = '';
         this.playerPropsElement.append(...this.createProperty("Name", this.name));
-        this.playerPropsElement.append(...this.createProperty("People aboard", this.peopleInShip));
+        this.playerPropsElement.append(...this.createProperty("People aboard", this.peopleAboard.value));
         // this.peopleInShip 
     }
     /**
@@ -134,84 +233,13 @@ export class clientController extends player implements energyUnit {
         }
     }
     /**
-     * Handles the packet packetCode.SYNCMOV.
-     * Updates the player's location and direction and calls updateElement
-     * @param packet Packet that initiated this event
-     */
-    private onSyncMov(packet: syncPosPacketData) {
-        this.location = new vector(packet.location.x, packet.location.y);
-        this.direction = packet.direction;
-        this.peopleInShip = packet.pplAboard;
-        console.log(packet.pplAboard);
-
-        this.updateElements();
-        this.updateInfoElement();
-    }
-    /**
-     * Handles the packet packetCode.SYNCENG.
-     * Updates all energy-related parameters, and calls updateBarElements
-     * @param packet Packet that initiated this event
-     */
-    private onSyncEng(packet: syncEngPacketData) {
-        this._consumption = packet.consumption;
-        this._production = packet.production;
-        this.updateBarElements();
-    }
-    private onSyncPlanet(packet: syncPlanetPacketData) {
-        let planet = this.getPlanet(packet.planetId);
-        this.updateInfoElement();
-        planet?.sync(packet);
-    }   
-    /**
-     * Handles the packet packetCode.NEWPLAYER.
-     * Creates the new player and its element in the DOM tree
-     * @param packet Packet that initiated this event
-     */
-    private onNewPlayer(packet: newPlayerPacketData) {
-        if (packet.playerId === this.id) return;
-        this.players.push(new clientPlayer(packet, this));
-    }
-    /**
-     * Handles the packet packetCode.DELPLAYER.
-     * Removes the player and its element in the DOM tree
-     * @param packet Packet that initiated this event
-     */
-    private onDelPlayer(packet: delPlayerPacketData) {
-        this.players = this.players.filter(v => {
-            if (v.id === packet.playerId) {
-                v.element.remove();
-                return false;
-            }
-            return true;
-        });
-    }
-    /**
-     * Handles the packet packetCode.MOVE.
-     * Updates the specified player's location and direction, as well as on the DOM tree
-     * @param packet Packet that initiated this event
-     */
-    private onMovePlayer(packet: movePacketData) {
-        if (packet.playerId === this.id) return;
-        this.players.find(v => v.id === packet.playerId)?.update(packet);
-    }
-    /**
-     * Handles the packet packetCode.NEWPLANET.
-     * Creates the new planet and adds it to the DOM tree
-     * @param data Packet that initiated this event
-     */
-    private onNewPlanet(data: newPlanetPacketData): void {
-        let planet = new clientPlanet(data);
-        this.planets.push(planet);
-        planet.updateElement();
-    }
-    /**
      * Gets a player by its id, including the self player
      * @param id Id of the player to get
      * @returns Player that was found
      */
     private getPlayer(id: number) {
-        if (id === this.id) return this;
-        return this.players.find(v => v.id === id);
+        // if (id === this.id) return this;
+        return this.players.value.find(v => v.id === id);
     }
     /**
      * Gets a planet by its id
@@ -219,107 +247,12 @@ export class clientController extends player implements energyUnit {
      * @returns Planet that was sfound
      */
     private getPlanet(id: number) {
-        return this.planets.find(v => v.id === id);
-    }
-    /**
-     * Handles the packet packetCode.OWNPLANET.
-     * Sets the owner of the planet. If the owner matches
-     * with the self player, its added to the list of
-     * self owned planets, too
-     * @param data Packet that initiated this event
-     */
-    private onOwnPlanet(data: ownPlanetPacketData): void {
-        let planet = this.getPlanet(data.planetId);
-        let player = this.getPlayer(data.playerId);
-
-        if (planet) {
-            this.planets.push(planet);
-            if (player) planet.owner = player;
-            planet.updateElement();
-            if (player === this) {
-                this.ownPlanets.push(planet);
-            }
-            this.updateInfoElement();
-        }
-    }
-    /**
-     * Handles the packet packetCode.DISOWNPLANET.
-     * Removes the owner of the disowned planet. If the owner is the self player,
-     * the planet is removed from the self owned planets, too
-     * @param data Packet that initiated this event
-     */
-    private onDisownPlanet(data: disownPlanetPacketData): void {
-        let planet = this.getPlanet(data.planetId);
-
-        if (planet) {
-            if (planet.owner === this) {
-                this.ownPlanets = this.ownPlanets.filter(v => v.id !== planet?.id);
-            }
-            planet.owner = undefined;
-            planet.updateElement();
-            this.updateInfoElement();
-        }
-    }
-    /**
-     * Handles the packet packetCode.SELECTPLANET
-     * Selects the specified planet, or if none is specified,
-     * deselects the current planet.
-     * Updates the DOM tree appropriately
-     * @param data Packet that initiated this event
-     */
-    private onSelectPlanet(data: selectPlanetPacketData) {
-        // Checks if same planet is being selected
-        if (data.planetId === this.selectedPlanet?.id) return;
-
-        if (typeof data.planetId === 'undefined') {
-            // Deselect currently selected planet
-            if (this.selectedPlanet) {
-                this.selectedPlanet.selected = false;
-                this.selectedPlanet.updateElement();
-                this.selectedPlanet = null;
-            }
-        }
-        else {
-            let planet = this.getPlanet(data.planetId);
-
-            // If we don't have the planet, we ignore the packet, otherwise, we
-            // deselect currently selected planet and select the given planet
-            if (planet) {
-                if (this.selectedPlanet) {
-                    this.selectedPlanet.selected = false;
-                    this.selectedPlanet.updateElement();
-                }
-                if (this.ownPlanets.includes(planet)) planet.selected = true;
-                planet.updateElement();
-                this.selectedPlanet = planet;
-            }
-        }
-
-        this.updateInfoElement();
-    }
-    /**
-     * Handles the packet packetCode.DELPLANET
-     * This never gets called, since planets never get deleted
-     * @param data Packet that initiated this event
-     */
-    private onDelPlanet(data: delPlanetPacketData): void {
-        this.planets = this.planets.filter(v => {
-            if (v.id === data.id) {
-                v.element.remove();
-                return false;
-            }
-            return true;
-        });
+        return this.planets.value.find(v => v.id === id);
     }
 
-    public get balance(): number {
-        return this.production - this.consumption;
-    }
-    public get production() {
-        return this._production;
-    }
-    public get consumption() {
-        return this._consumption;
+    private async frame(time: number) {
+        await this.redraw((time - this.lastTickTime) / (this._delta * 1000));
+        requestAnimationFrame(this.frame.bind(this));
     }
 
     /**
@@ -329,57 +262,47 @@ export class clientController extends player implements energyUnit {
      * @param name The name of the self player
      */
     public constructor(packet: initPacketData, connection: packetConnection, name: string) {
-        super(name, packet.selfId, new vector(packet.location.x, packet.location.y), packet.rotation);
+        let _planets = new arrayProperty<planet>();
+        super({ planets: _planets }, name, packet.selfId, new vector(0, 0), 0);
+
+        this.planets = _planets;
+        this._players.onAdd.subscribe
+
+        this.players.add(this);
+        this._players.onAdd.subscribe(v => this.players.add(v));
+        this._players.onRemove.subscribe(v => this.players.remove(v));
+
         this._connection = connection;
-    
-        this.subscribers.push(
+
+        this._subscribers.push(
             onKeydown.subscribe(kb => {
                 if (!kb.repeat) this.onKey(kb.code, true);
             }),
             onKeyup.subscribe(kb => this.onKey(kb.code, false)),
         );
 
-        this.takePeopleCountElement.oninput = () => {
-            let val = this.takePeopleCountElement.value;
-            try {
-                let numVal = Number.parseFloat(val);
-                if (numVal > (this.selectedPlanet?.population ?? 0) * 1000) this.takePeopleBtnElement.disabled = true;
-                else this.takePeopleBtnElement.disabled = false;
-            }
-            catch (e) {}
-        };
-        this.leavePeopleCountElement.oninput = () => {
-            let val = this.leavePeopleCountElement.value;
-            try {
-                let numVal = Number.parseFloat(val);
-                console.log(numVal, this.peopleInShip);
-                // || numVal > (this.selectedPlanet?.limit ?? 0) - (this.selectedPlanet?.population ?? 0)
-                this.leavePeopleBtnElement.disabled = numVal > this.peopleInShip;
-            }
-            catch (e) {}
-        };
+        this._connection.onPacket<tickPacketData>(packetCode.TICK).subscribe(v => this.onTick(v.data));
+        this._connection.onPacket<kickPacketData>(packetCode.KICK).subscribe(v => this.onKick(v.data));
         
-        this.takePeopleBtnElement.onclick = () => {
-            this._connection.sendPacket(packetCode.TAKEPPL, {
-                count: Number.parseFloat(this.takePeopleCountElement.value),
-            });
-        };
+        this.lastTickTime = performance.now();
+
+        this.prevDirection = this.direction.value;
+        this.prevLocation = this.location.value;
+
         this.leavePeopleBtnElement.onclick = () => {
-            this._connection.sendPacket(packetCode.LEAVEEPPL, {
-                count: Number.parseFloat(this.leavePeopleCountElement.value),
-            });
+            this._connection.sendPacket(packetCode.SHIPCONTROL, {
+                count: Number.parseInt(this.peopleCountElement.value),
+                leave: true,
+            } as shipControlPacketData);
+        };
+        this.takePeopleBtnElement.onclick = () => {
+            this._connection.sendPacket(packetCode.SHIPCONTROL, {
+                count: Number.parseInt(this.peopleCountElement.value),
+                leave: false,
+            } as shipControlPacketData);
         };
 
-        this._connection.onPacket<syncPosPacketData>(packetCode.SYNCPOS).subscribe(v => this.onSyncMov(v.data));
-        this._connection.onPacket<syncEngPacketData>(packetCode.SYNCENG).subscribe(v => this.onSyncEng(v.data));
-        this._connection.onPacket<newPlayerPacketData>(packetCode.NEWPLAYER).subscribe(v => this.onNewPlayer(v.data));
-        this._connection.onPacket<delPlayerPacketData>(packetCode.DELPLAYER).subscribe(v => this.onDelPlayer(v.data));
-        this._connection.onPacket<movePacketData>(packetCode.MOVE).subscribe(v => this.onMovePlayer(v.data));
-        this._connection.onPacket<newPlanetPacketData>(packetCode.NEWPLANET).subscribe(v => this.onNewPlanet(v.data));
-        this._connection.onPacket<ownPlanetPacketData>(packetCode.OWNPLANET).subscribe(v => this.onOwnPlanet(v.data));
-        this._connection.onPacket<disownPlanetPacketData>(packetCode.DISOWNPLANET).subscribe(v => this.onDisownPlanet(v.data));
-        this._connection.onPacket<syncPlanetPacketData>(packetCode.SYNCPLANET).subscribe(v => this.onSyncPlanet(v.data));
-        this._connection.onPacket<selectPlanetPacketData>(packetCode.SELECTPLANET).subscribe(v => this.onSelectPlanet(v.data));
+        requestAnimationFrame(this.frame.bind(this));
     }
 
     /**

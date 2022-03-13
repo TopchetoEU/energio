@@ -3,8 +3,6 @@ export interface point {
     y: number;
 }
 
-export type logoffPacketData = undefined;
-
 export enum packetCode {
     NONE = 0,
     LOGIN,
@@ -12,17 +10,6 @@ export enum packetCode {
     KICK,
     INIT,
     CONTROL,
-    MOVE,
-    SYNCPOS,
-    SYNCENG,
-    NEWPLAYER,
-    DELPLAYER,
-    NEWPLANET,
-    DELPLANET,
-    OWNPLANET,
-    DISOWNPLANET,
-    SYNCPLANET,
-    SELECTPLANET,
-    TAKEPPL,
-    LEAVEEPPL,
+    SHIPCONTROL,
+    TICK,
 }
