@@ -2,16 +2,16 @@ import { transform } from "typescript";
 import { vector } from "../common/vector";
 
 interface transformation {
-    undo(context: CanvasRenderingContext2D): void;
-    apply(context: CanvasRenderingContext2D): void;
+    undo(context: DOMMatrix): void;
+    apply(context: DOMMatrix): void;
 }
 
 class translation implements transformation {
-    undo(context: CanvasRenderingContext2D): void {
-        context.translate(-this.x, -this.y);
+    undo(context: DOMMatrix): void {
+        context.translateSelf(-this.x, -this.y);
     }
-    apply(context: CanvasRenderingContext2D): void {
-        context.translate(this.x, this.y);
+    apply(context: DOMMatrix): void {
+        context.translateSelf(this.x, this.y);
     }
 
     public constructor(
@@ -20,11 +20,11 @@ class translation implements transformation {
     ) {}
 }
 class rotation implements transformation {
-    undo(context: CanvasRenderingContext2D): void {
-        context.rotate(-this.angle);
+    undo(context: DOMMatrix): void {
+        context.rotateSelf(-this.angle);
     }
-    apply(context: CanvasRenderingContext2D): void {
-        context.rotate(this.angle);
+    apply(context: DOMMatrix): void {
+        context.rotateSelf(this.angle);
     }
 
     public constructor(
@@ -33,6 +33,8 @@ class rotation implements transformation {
 }
 
 export class transformStack {
+    public transformOrigin: vector = vector.zero;
+
     // The transformations that were applied, in order
     private transStack: transformation[] = [];
     private countStack: number[] = [];
@@ -43,7 +45,9 @@ export class transformStack {
     private pushTransformation(transform: transformation) {
         if (this.countStack.length === 0) throw new Error("begin() must be called before any transformations are applied");
         this.transStack.push(transform);
-        transform.apply(this.context);
+        let matrix = this.context.getTransform();
+        transform.apply(matrix);
+        this.context.setTransform(matrix);
         this.countStack[this.countStack.length - 1]++;
     }
     /**
@@ -52,7 +56,9 @@ export class transformStack {
     private popTransformation() {
         let transform = this.transStack.pop();
         if (transform) {
-            transform.undo(this.context);
+            let matrix = this.context.getTransform();
+            transform.undo(matrix);
+            this.context.setTransform(matrix);
         }
     }
 
@@ -89,8 +95,10 @@ export class transformStack {
      * @param offset Offset to translate with
      */
     public rotate(angle: number, inRadians: boolean = false) {
-        if (!inRadians) angle = angle * Math.PI / 180;
+        if (inRadians) angle = angle / Math.PI * 180;
+        if (!this.transformOrigin.equals(vector.zero)) this.translate(this.transformOrigin.invert());
         this.pushTransformation(new rotation(angle));
+        if (!this.transformOrigin.equals(vector.zero)) this.translate(this.transformOrigin);
     }
 
     /**

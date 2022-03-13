@@ -1,18 +1,34 @@
-import { movePacketData, newPlayerPacketData } from "../common/packets/server";
+import { playerCreateData } from "../common/packets/server";
+import { planet, planetsOwner } from "../common/planet";
 import { player } from "../common/player";
+import { objectChangeApplier, translator } from "../common/props/changeTracker";
 import { ExtMath, vector } from "../common/vector";
-import { clientController } from "./clientController";
+import { clientController, drawImage } from "./clientController";
 import { resources } from "./resources";
 import { transformStack } from "./transformStack";
 
 export class clientPlayer extends player {
-    public readonly element: HTMLDivElement;
-    public readonly usernameElement: HTMLSpanElement;
-    public readonly imageElement: HTMLImageElement;
-    private readonly game: clientController;
-
     public prevLocation: vector;
     public prevDirection: number;
+
+    public readonly planetTranslator: translator<number, planet> = {
+        translateFrom: v => v.id,
+        translateTo: v => {
+            let res = this.planetOwner.planets.value.find(_v => _v.id === v);
+            if (res) return res;
+            else throw new Error("Invalid planet given.");
+        },
+    };
+
+    public readonly applier = new objectChangeApplier()
+        .prop('ownedPlanets', true, this.planetTranslator)
+        .prop('peopleAboard')
+        .prop('location', false, vector.pointTranslator)
+        .prop('direction')
+        .prop('moving')
+        .prop('production')
+        .prop('consumption')
+        .prop('selectedPlanet', false, this.planetTranslator);
 
     private get rocketImg(): string {
         return '/static/images/player.png';
@@ -22,75 +38,44 @@ export class clientPlayer extends player {
         stack.begin();
         stack.rotate(rotation);
 
-        canvas.drawImage(await resources.getImage(this.rocketImg), 0, 0);
+        await drawImage(canvas, this.rocketImg);
 
         stack.end();
     }
-    private drawTitle(canvas: CanvasRenderingContext2D, stack: transformStack) {
-        stack.begin();
-        stack.translate(new vector(0, 30));
+    private drawTitle(canvas: CanvasRenderingContext2D, stack: transformStack, clientRotation: number) {
+        stack.rotate(clientRotation);
+        stack.translate(new vector(0, -100));
 
         canvas.fillStyle = '#fff';
-        canvas.strokeStyle = '1px solid #000';
+        canvas.strokeStyle = '3px solid #000';
         canvas.textAlign = 'center';
+        canvas.font = 'bolder'
 
         canvas.fillText(this.name, 0, 0);
-        canvas.strokeText(this.name, 0, 0);
+        // canvas.strokeText(this.name, 0, 0);
         
+        // canvas.stroke();
         canvas.fill();
-        canvas.stroke();
-
-        stack.end();
     }
 
-    public async draw(canvas: CanvasRenderingContext2D, stack: transformStack, tickDelta: number) {
+    public async draw(canvas: CanvasRenderingContext2D, stack: transformStack, clientRotation: number, tickDelta: number) {
         stack.begin();
 
-        let lerpedLoc = this.prevLocation.lerp(this.location, tickDelta);
-        let lerpedDir = ExtMath.lerp(this.prevDirection, this.direction, tickDelta);
+        let lerpedLoc = this.prevLocation.lerp(this.location.value, tickDelta);
+        let lerpedDir = ExtMath.lerp(this.prevDirection, this.direction.value, tickDelta);
 
         stack.translate(lerpedLoc);
 
         await this.drawRocket(canvas, stack, lerpedDir);
-        this.drawTitle(canvas, stack);
+        this.drawTitle(canvas, stack, clientRotation);
 
         stack.end();
     }
 
-    public update(packet: movePacketData) {
-        this.direction = packet.newDirection;
-        this.location = new vector(packet.newLocation.x, packet.newLocation.y);
-        this.updateElement();
-    }
-    public updateElement() {
-        this.element.style.transform = `translate(${this.location.x}px, ${this.location.y}px)`;
-        this.usernameElement.style.transform = `rotate(${this.game.direction}deg) translateY(-40px)`;
-        this.imageElement.style.transform = `rotate(${this.direction}deg)`;
-    }
+    public constructor(planetOwner: planetsOwner, packet: playerCreateData) {
+        super(planetOwner, packet.name, packet.id, vector.fromPoint(packet.location), packet.direction);
 
-    public constructor(packet: newPlayerPacketData, controller: clientController) {
-        super(packet.name, packet.playerId, new vector(packet.location.x, packet.location.y), packet.direction);
-
-        this.prevDirection = this.direction;
-        this.prevLocation = this.location;
-        this.game = controller;
-
-        this.imageElement = document.createElement('img');
-        this.imageElement.src = '/static/images/player.png';
-        this.imageElement.classList.add('movable');
-        this.imageElement.draggable = false;
-
-        this.usernameElement = document.createElement('span');
-        this.usernameElement.innerText = packet.name;   
-        this.usernameElement.classList.add('movable');
-
-        this.element = document.createElement('div');
-        this.element.classList.add('player', 'movable');
-        this.element.appendChild(this.imageElement);
-        this.element.appendChild(this.usernameElement);
-
-        this.updateElement();
-
-        document.getElementById('game')?.appendChild(this.element);
+        this.prevDirection = this.direction.value;
+        this.prevLocation = this.location.value;
     }
 }

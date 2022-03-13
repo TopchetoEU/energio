@@ -21,8 +21,8 @@ export class valueProperty<T> implements property<T> {
     }
     public set value(val: T) {
         if (this.equator(this.value, val)) return;
-        this._onChange.next(val);
         this._value = val;
+        this._onChange.next(val);
     }
 
     public get onChange(): Observable<T> {
@@ -78,6 +78,10 @@ export class arrayProperty<T> implements property<T[]> {
             this._onRemove.next(val);
         });
         this._arr = [];
+    }
+
+    public forEach(iterator: (val: T) => void) {
+        this.value.forEach(iterator);
     }
 
     public get onAdd(): Observable<T> {

@@ -54,12 +54,18 @@ export interface planetCreateData {
  * Data, used to update a player on the client-side.
  * Sent by the server
  */
-export type playerUpdateData = objectChangeDescriptor; 
+export interface playerUpdateData {
+    id: number;
+    changes: objectChangeDescriptor;
+}
 /**
  * Data, used to update a planet on the client-side.
  * Sent by the server
  */
-export type planetUpdateData = objectChangeDescriptor;
+export interface planetUpdateData {
+    id: number;
+    changes: objectChangeDescriptor;
+}
 
 
 /**
@@ -72,12 +78,12 @@ export interface tickPacketData {
      * An array, containing all changes, that were made to all
      * visible players since the last tick
      */
-    updatedPlayers: { [id: number]: playerUpdateData };
+    updatedPlayers: playerUpdateData[];
     /**
      * An array, containing all changes, that were made to all
      * visible planets since the last tick
      */
-    updatedPlanets: { [id: number]: planetUpdateData };
+    updatedPlanets: planetUpdateData[];
     /**
      * An array, containing initialization data for all
      * players, that were created since the last tick, or
@@ -106,7 +112,7 @@ export interface tickPacketData {
      * The id of the currently selected planet (closest planet to
      * the player). If none, it will be -1
      */
-    selectedPlanetId?: number | -1;
+    selectedPlanetId: number | -1;
     /**
      * The time elapsed since last tick (generally the length of
      * the tick, but there might be variation depending on the

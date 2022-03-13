@@ -1,7 +1,8 @@
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 const _path = require('path');
 
 module.exports = {
-    mode: "production",
+    mode: "development",
     entry: "./build/client/entry.js",
     output: {
         path: _path.resolve(__dirname, 'static/js'),
@@ -31,5 +32,15 @@ module.exports = {
             //     }
             // ],
         }],
-    }
+    },
+    devServer: {
+        contentBase: _path.resolve(__dirname, 'static'),
+        compress: true,
+        hot: true,
+        port: 10,
+        publicPath: '/',
+        host: '192.168.0.104',
+        disableHostCheck: true,
+        open: true,
+    },
 };

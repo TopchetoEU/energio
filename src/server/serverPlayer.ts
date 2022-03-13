@@ -9,6 +9,8 @@ import { HighlightSpanKind } from "typescript";
 import { property } from "../common/props/property";
 import { planet, planetsOwner } from "../common/planet";
 import { merge, Subscriber, Subscription } from "rxjs";
+import { objectChangeTracker, trackableObject, translator } from "../common/props/changeTracker";
+import { playerCreateData } from "../common/packets/server";
 
 export const SPEED = 100;
 export const DRAG = -.8;
@@ -25,7 +27,18 @@ export type packetHandle<T> = (player: serverPlayer, packet: packet<T>) => void;
 
 let nextId = 1;
 
-export class serverPlayer extends player implements energyUnit {
+export class serverPlayer extends player implements energyUnit, trackableObject {
+    public readonly tracker;
+    public readonly planetTranslator: translator<planet, number> = {
+        translateFrom: v => {
+            let res = this.planetOwner.planets.value.find(_v => _v.id === v);
+            if (res) return res;
+            else throw new Error("Invalid planet given.");
+        },
+        translateTo: v => v.id,
+    };
+    public readonly creationData: playerCreateData;
+
     public readonly connection: packetConnection;
 
     public rotationDirection: rotationDirection = rotationDirection.NONE;
@@ -44,26 +57,31 @@ export class serverPlayer extends player implements energyUnit {
     private updatePos(delta: number) {
         this._angularVelocity += this.rotationDirection * ANGULAR_SPEED;
 
-        this.tryConsume(1, () => {
-            this._velocity = this._velocity.add(vector.fromDirection(this.direction.value).multiply(SPEED * delta));
-        });
-    
+        if (this.moving.value) {
+            // this.tryConsume(1, () => {
+                this._velocity = this._velocity.add(vector.fromDirection(this.direction.value).multiply(SPEED * delta));
+            // });
+        }
+        
         if (Math.abs(this._angularVelocity) < EPSILON) this._angularVelocity = 0;
         else this.direction.value += this.angularVelocity * delta;
-        this._angularVelocity *= ExtMath.drag(ANGULAR_DRAG, delta);
-        this._velocity = this._velocity.drag(DRAG, delta);
-
+        
         if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
         else this.location.value = this.location.value.add(this.velocity);
+        
+        
+        this._angularVelocity *= ExtMath.drag(ANGULAR_DRAG, delta);
+        this._velocity = this._velocity.drag(DRAG, delta);
     }
     private updateStats(planets: planet[]) {
-        this.production.value = planets.reduce((prev, curr) => prev + curr.production.value, 0);
-        this.consumption.value = planets.reduce((prev, curr) => prev + curr.consumption.value, 0);
+        // this.production.value = planets.reduce((prev, curr) => prev + curr.production.value, 0);
+        // this.consumption.value = planets.reduce((prev, curr) => prev + curr.consumption.value, 0);
     }
     private updateSelection(location: vector) {
         let leastDist = -1;
 
         let closestPlanet: serverPlanet | undefined;
+
 
         // Finds closest planet
         for (let planet of this.planetOwner.planets.value) {
@@ -90,6 +108,7 @@ export class serverPlayer extends player implements energyUnit {
 
     public constructor(planetsOwner: planetsOwner, name: string, connection: packetConnection, location?: vector, direction?: number) {
         super(planetsOwner, name, nextId++, location, direction);
+
         this.connection = connection;
 
         this.ownedPlanets.onChange.subscribe(this.updateStats);
@@ -99,6 +118,25 @@ export class serverPlayer extends player implements energyUnit {
         this.ownedPlanets.onRemove.subscribe(v => {
             delete this._subscribers[v.id];
         });
-        this.location.onChange.subscribe(this.updateSelection);
+        this.location.onChange.subscribe(v => this.updateSelection(v));
+        this.ownedPlanets.onAdd.subscribe(v => v.owner.value = this);
+        this.ownedPlanets.onRemove.subscribe(v => v.owner.value = undefined);
+
+        this.creationData = {
+            direction: this.direction.value,
+            id: this.id,
+            location: this.location.value,
+            name: name
+        }
+
+        this.tracker = new objectChangeTracker(this)
+            .prop('ownedPlanets', true, this.planetTranslator)
+            .prop('peopleAboard')
+            .prop('location', false, vector.pointTranslator)
+            .prop('selectedPlanet', false, this.planetTranslator)
+            .prop('direction')
+            .prop('moving')
+            .prop('production')
+            .prop('consumption');
     }
 }

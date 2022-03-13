@@ -7,7 +7,11 @@ import { arrayProperty, valueProperty } from "./property";
 
 interface nameTrackerPair {
     name: string;
-    tracker: changeTracker<unknown, propertyChangeDescriptor>;
+    tracker: changeTracker<any, propertyChangeDescriptor>;
+}
+interface nameApplierPair {
+    name: string;
+    applier: changeApplier<any, any>;
     isArray: boolean;
 }
 
@@ -48,8 +52,16 @@ export const defaultTranslator: translator<any, any> = {
     translateTo: v => v,
 };
 
+export function invertTranslator<srcT, destT>(translator: translator<srcT, destT>): translator<destT, srcT> {
+    return {
+        translateFrom: translator.translateTo,
+        translateTo: translator.translateFrom,
+    };
+}
+
 export interface changeTracker<T, descT> extends disposable {
     get changeDescriptor(): descT;
+    get initDescriptor(): descT;
     clearChanges(): void;
 }
 
@@ -74,8 +86,40 @@ export class arrayChangeApplier<srcT, T> implements changeApplier<arrayProperty<
     public constructor(private translator: translator<srcT, T> = defaultTranslator) {
     }
 }
+export class objectChangeApplier implements changeApplier<any, objectChangeDescriptor> {
+    private props = new arrayProperty<nameApplierPair>();
 
-export class valueChangeTracker<PropT, T> implements changeTracker<T, valueChangeDescriptor<T>> {
+    public applyChanges(descriptor: objectChangeDescriptor, obj: any): void {
+        this.props.forEach(prop => {
+            prop.applier.applyChanges(descriptor[prop.name], obj[prop.name]);
+        });
+    }
+
+    public prop(name: string, isArray: boolean = false, translator: translator<any, any> = defaultTranslator) {
+        if (this.props.value.find(v => v.name === name)) {
+            throw new Error(`Property ${name} is already in the apply list.`);
+        }
+
+        if (isArray)
+            this.props.add({
+                name, isArray,
+                applier: new arrayChangeApplier(translator),
+            });
+        else
+            this.props.add({
+                name, isArray,
+                applier: new valueChangeApplier(translator)
+            });
+
+        return this;
+    }
+
+    constructor() {
+
+    }
+}
+
+export class valueChangeTracker<propT, T = propT> implements changeTracker<T, valueChangeDescriptor<T>> {
     private _dispose = false;
     private changeHandle: Subscription;
     private changed = false;
@@ -91,103 +135,116 @@ export class valueChangeTracker<PropT, T> implements changeTracker<T, valueChang
     get changeDescriptor(): valueChangeDescriptor<T> {
         return this.changed ? this.translator.translateTo(this.prop.value) : undefined;
     }
+    get initDescriptor(): valueChangeDescriptor<T> {
+        return this.translator.translateTo(this.prop.value);
+    }
     clearChanges(): void {
         this.changed = false;
     }
 
-    constructor(private prop: valueProperty<PropT>, private translator: translator<PropT, T> = defaultTranslator) {
+    constructor(private prop: valueProperty<propT>, private translator: translator<propT, T> = defaultTranslator) {
         this.changeHandle = prop.onChange.subscribe(() => this.changed = true);
     }
 }
-export class arrayChangeTracker<propT, T> implements changeTracker<T[], arrayChangeDescriptor<T>> {
-    private added: arrayProperty<T>;
-    private removed: arrayProperty<T>;
-    private _dispose = false;
-    private addHandle: Subscription;
-    private removeHandle: Subscription;
+export class arrayChangeTracker<propT, T = propT> implements changeTracker<T[], arrayChangeDescriptor<T>> {
+    private _added: arrayProperty<T>;
+    private _removed: arrayProperty<T>;
+    private _disposed = false;
+    private _addHandle: Subscription;
+    private _removeHandle: Subscription;
+
+    public get added() {
+        return this._added.value;
+    }
+    public get removed() {
+        return this._removed.value;
+    }
 
     public dispose(): void {
         if (this.disposed) return;
-        this.addHandle.unsubscribe();
-        this.removeHandle.unsubscribe();
+        this._addHandle.unsubscribe();
+        this._removeHandle.unsubscribe();
     }
     public get disposed(): boolean {
-        return this._dispose;
+        return this._disposed;
     }
 
+    get initDescriptor(): arrayChangeDescriptor<T> {
+        return {
+            added: this.prop.value.map(v => this.translator.translateTo(v)),
+            removed: [],
+        };
+    }
     get changeDescriptor(): arrayChangeDescriptor<T> {
         return {
-            added: this.added.value,
-            removed: this.removed.value,
+            added: this._added.value,
+            removed: this._removed.value,
         };
     }
     clearChanges(): void {
-        this.added.clear();
-        this.removed.clear();
+        this._added.clear();
+        this._removed.clear();
     }
 
-    constructor(prop: arrayProperty<propT>, translator: translator<propT, T> = defaultTranslator) {
+    constructor(private prop: arrayProperty<propT>, private translator: translator<propT, T> = defaultTranslator) {
         const equator = (a: T, b: T) =>  prop.equator(translator.translateFrom(a), translator.translateFrom(b));
-        this.added = new arrayProperty(equator);
-        this.removed = new arrayProperty(equator);
+        this._added = new arrayProperty(equator);
+        this._removed = new arrayProperty(equator);
 
-        this.addHandle = prop.onAdd.subscribe(v => {
+        this._addHandle = prop.onAdd.subscribe(v => {
             const translated = translator.translateTo(v);
-            this.added.add(translated);
-            this.removed.remove(translated);
+            this._added.add(translated);
+            this._removed.remove(translated);
         });
-        this.removeHandle = prop.onRemove.subscribe(v => {
+        this._removeHandle = prop.onRemove.subscribe(v => {
             const translated = translator.translateTo(v);
-            this.removed.add(translated);
-            this.added.remove(translated);
+            this._removed.add(translated);
+            this._added.remove(translated);
         });
     }
 }
-
-export interface trackable<T, descT> {
-    get tracker(): changeTracker<T, descT>;
-}
-export interface trackableObject extends trackable<any, objectChangeDescriptor> {
-    get tracker(): objectChangeTracker;
-}
-
 export class objectChangeTracker implements changeTracker<any, objectChangeDescriptor> {
     private trackers = new arrayProperty<nameTrackerPair>();
     private _disposed: boolean = false;
 
-    public track(name: string, isArray: boolean = false, translator: translator<any, any> = defaultTranslator) {
+    public prop(name: string, isArray: boolean = false, translator: translator<any, any> = defaultTranslator) {
         if (this.trackers.value.find(v => v.name === name)) {
             throw new Error(`Property ${name} is already being tracked.`);
         }
 
         if (isArray)
             this.trackers.add({
-                name, isArray,
+                name,
                 tracker: new arrayChangeTracker(this.object[name] as arrayProperty<any>, translator)
             });
         else
         this.trackers.add({
-            name, isArray,
+            name,
             tracker: new valueChangeTracker(this.object[name] as valueProperty<any>, translator)
         });
 
         return this;
     }
-    public untrack(...names: string[]) {
+    public removeProp(...names: string[]) {
         this.trackers.removeIf(v => names.includes(v.name));
     }
 
+    public get initDescriptor(): objectChangeDescriptor {
+        let obj: objectChangeDescriptor = {};
+        this.trackers.forEach(v => obj[v.name] = v.tracker.initDescriptor);
+        return obj;
+    }
     public get changeDescriptor(): objectChangeDescriptor {
         let obj: objectChangeDescriptor = {};
-        this.trackers.value.forEach(v => obj[v.name] = v.tracker.changeDescriptor);
+        this.trackers.forEach(v => obj[v.name] = v.tracker.changeDescriptor);
         return obj;
     }
     clearChanges(): void {
-        this.trackers.value.forEach(v => v.tracker.clearChanges());
+        this.trackers.forEach(v => v.tracker.clearChanges());
     }
     dispose(): void {
         if (this.disposed) return;
-        this.trackers.value.forEach(v => v.tracker.dispose());
+        this.trackers.forEach(v => v.tracker.dispose());
     }
     get disposed(): boolean {
         return this._disposed;
@@ -196,4 +253,12 @@ export class objectChangeTracker implements changeTracker<any, objectChangeDescr
     public constructor(private object: any) {
 
     }
+}
+
+
+export interface trackable<T, descT> {
+    get tracker(): changeTracker<T, descT>;
+}
+export interface trackableObject extends trackable<any, objectChangeDescriptor> {
+    get tracker(): objectChangeTracker;
 }

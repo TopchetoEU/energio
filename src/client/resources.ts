@@ -8,10 +8,12 @@ export const resources = {
             let img = map[src];
             if (img) return resolve(img);
             else {
+                console.log(src);
                 img = new Image();
                 img.src = src;
                 img.onload = () => {
                     img.onload = null;
+                    map[src] = img;
                     resolve(img);
                 };
                 img.onerror = err => {

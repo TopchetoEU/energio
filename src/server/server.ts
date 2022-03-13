@@ -6,7 +6,7 @@ import { promisify } from "util";
 import { serverController } from "./serverController";
 import { getConfig } from "./gameConfig";
 
-new serverController(8001, getConfig());
+new serverController(8001, getConfig(), 0.1);
 
 const app = express();
 app.use('/static', express.static(path.resolve(__dirname, '../../static')));
