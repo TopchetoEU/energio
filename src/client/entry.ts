@@ -17,7 +17,7 @@ window.onresize = e => {
 }
 
 (document.getElementById('playbtn') as HTMLElement).onclick = () => {
-    let ws = new WebSocket('ws://77.70.55.157:8001');
+    let ws = new WebSocket('ws://77.70.55.157:8002');
     ws.onopen = async () => {
         let socket = new clientSocket(ws);
         await clientController.create(socket, (document.getElementById('username') as HTMLInputElement).value);

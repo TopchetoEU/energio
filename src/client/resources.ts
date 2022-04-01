@@ -4,6 +4,7 @@ const map: { [src: string]: HTMLImageElement } = {};
 
 export const resources = {
     getImage(src: string): Promise<CanvasImageSource> {
+        src = 'images/' + src;
         return new Promise((resolve, reject) => {
             let img = map[src];
             if (img) return resolve(img);

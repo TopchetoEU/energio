@@ -59,7 +59,7 @@ export class serverPlanet extends planet implements trackableObject {
             location: this.location,
         };
         this.tracker = new objectChangeTracker(this)
-            .prop('owner', false, this.idTranslator)
+            .prop('owner', this.idTranslator)
             .prop('population')
             .prop('production')
             .prop('consumption');

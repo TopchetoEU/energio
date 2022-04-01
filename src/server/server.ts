@@ -6,9 +6,9 @@ import { promisify } from "util";
 import { serverController } from "./serverController";
 import { getConfig } from "./gameConfig";
 
-new serverController(8001, getConfig(), 0.1);
+let controller = new serverController(8002, getConfig(), 0.1);
 
 const app = express();
-app.use('/static', express.static(path.resolve(__dirname, '../../static')));
-app.get('/', (req,res) => res.redirect('/static/html/index.html'));
+app.use('/', express.static(path.resolve(__dirname, '../../static')));
+app.get('*', (req,res) => res.redirect('/index.html'));
 app.listen(80, () => console.log("Listening to :80!"));

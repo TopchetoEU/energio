@@ -2,10 +2,13 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0;
     margin: 0;
 }
+* {
+    user-select: none;
+}
 
 @font-face {
     font-family: majormonodisplay;
-    src: url(/static/HeadHuman.otf);
+    src: url(../HeadHuman.otf);
 }
 
 html, body {

@@ -136,7 +136,7 @@ export class serverPlayer extends player implements energyUnit, trackableObject 
 
         this.tracker = new objectChangeTracker(this)
             .prop('peopleAboard')
-            .prop('location', false, vector.pointTranslator)
+            .prop('location', vector.pointTranslator)
             .prop('direction')
             .prop('moving')
             .prop('production')

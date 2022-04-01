@@ -18,7 +18,7 @@ export class clientPlanet extends planet {
         },
     };
     public readonly applier = new objectChangeApplier()
-        .prop('owner', false, this.idTranslator)
+        .prop('owner', this.idTranslator)
         .prop('population')
         .prop('production')
         .prop('consumption');

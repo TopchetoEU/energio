@@ -95,21 +95,27 @@ export class objectChangeApplier implements changeApplier<any, objectChangeDescr
         });
     }
 
-    public prop(name: string, isArray: boolean = false, translator: translator<any, any> = defaultTranslator) {
+    public arr(name: string, translator: translator<any, any> = defaultTranslator) {
         if (this.props.value.find(v => v.name === name)) {
             throw new Error(`Property ${name} is already in the apply list.`);
         }
 
-        if (isArray)
-            this.props.add({
-                name, isArray,
-                applier: new arrayChangeApplier(translator),
-            });
-        else
-            this.props.add({
-                name, isArray,
-                applier: new valueChangeApplier(translator)
-            });
+        this.props.add({
+            name, isArray: true,
+            applier: new arrayChangeApplier(translator),
+        });
+
+        return this;
+    }
+    public prop(name: string, translator: translator<any, any> = defaultTranslator) {
+        if (this.props.value.find(v => v.name === name)) {
+            throw new Error(`Property ${name} is already in the apply list.`);
+        }
+
+        this.props.add({
+            name, isArray: false,
+            applier: new valueChangeApplier(translator)
+        });
 
         return this;
     }
@@ -207,20 +213,26 @@ export class objectChangeTracker implements changeTracker<any, objectChangeDescr
     private trackers = new arrayProperty<nameTrackerPair>();
     private _disposed: boolean = false;
 
-    public prop(name: string, isArray: boolean = false, translator: translator<any, any> = defaultTranslator) {
+    public arr(name: string, translator: translator<any, any> = defaultTranslator) {
         if (this.trackers.value.find(v => v.name === name)) {
             throw new Error(`Property ${name} is already being tracked.`);
         }
 
-        if (isArray)
-            this.trackers.add({
-                name,
-                tracker: new arrayChangeTracker(this.object[name] as arrayProperty<any>, translator)
-            });
-        else
         this.trackers.add({
             name,
-            tracker: new valueChangeTracker(this.object[name] as valueProperty<any>, translator)
+            tracker: new arrayChangeTracker(arrayProperty.fromObject<any>(this.object[name]), translator)
+        });
+
+        return this;
+    }
+    public prop(name: string, translator: translator<any, any> = defaultTranslator) {
+        if (this.trackers.value.find(v => v.name === name)) {
+            throw new Error(`Property ${name} is already being tracked.`);
+        }
+
+        this.trackers.add({
+            name,
+            tracker: new valueChangeTracker(valueProperty.fromObject<any>(this.object[name]), translator)
         });
 
         return this;
@@ -254,7 +266,6 @@ export class objectChangeTracker implements changeTracker<any, objectChangeDescr
 
     }
 }
-
 
 export interface trackable<T, descT> {
     get tracker(): changeTracker<T, descT>;

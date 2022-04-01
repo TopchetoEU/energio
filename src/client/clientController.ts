@@ -56,7 +56,7 @@ export class clientController extends player implements energyUnit {
 
     public readonly applier = new objectChangeApplier()
         .prop('peopleAboard')
-        .prop('location', false, vector.pointTranslator)
+        .prop('location', vector.pointTranslator)
         .prop('direction')
         .prop('moving')
         .prop('production')
@@ -108,7 +108,7 @@ export class clientController extends player implements energyUnit {
         this.lastTickTime = performance.now();
     }
     private onKick(data: kickPacketData): void {
-        throw new Error("Method not implemented.");
+
     }
 
 
@@ -117,7 +117,7 @@ export class clientController extends player implements energyUnit {
         stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
 
         // stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
-        await drawImage(canvas, '/static/images/player.png');
+        await drawImage(canvas, 'player.png');
 
         stack.end();
     }
