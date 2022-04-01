@@ -23,7 +23,7 @@ export class clientPlayer extends player {
     public readonly applier = new objectChangeApplier()
         // .prop('ownedPlanets', true, this.planetTranslator)
         .prop('peopleAboard')
-        .prop('location', false, vector.pointTranslator)
+        .prop('location', vector.pointTranslator)
         .prop('direction')
         .prop('moving')
         .prop('production')

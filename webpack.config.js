@@ -1,4 +1,3 @@
-const HtmlWebpackPlugin = require('html-webpack-plugin');
 const _path = require('path');
 
 module.exports = {
@@ -8,7 +7,7 @@ module.exports = {
         path: _path.resolve(__dirname, 'static/js'),
         filename: 'bundle.js',
         publicPath: '/static/js',
-        sourceMapFilename: _path.resolve(__dirname, 'static/js/sourcemap.js'),
+        sourceMapFilename: 'sourcemap.js',
         // library: {
         //     type: "umd",
         //     name: "shooter-lib",
@@ -34,14 +33,14 @@ module.exports = {
             // ],
         }],
     },
-    devServer: {
-        contentBase: _path.resolve(__dirname, 'static'),
-        compress: true,
-        hot: true,
-        port: 10,
-        publicPath: '/',
-        host: '192.168.0.104',
-        disableHostCheck: true,
-        open: true,
-    },
+    // devServer: {
+    //     contentBase: _path.resolve(__dirname, 'static'),
+    //     compress: true,
+    //     hot: true,
+    //     port: 10,
+    //     publicPath: '/',
+    //     host: '192.168.0.104',
+    //     disableHostCheck: true,
+    //     open: true,
+    // },
 };

@@ -5,6 +5,41 @@ export type equator<T> = (a: T, b: T) => boolean;
 export const defaultEquator: equator<any> = (a, b) => a === b;
 export const numEquator: equator<number> = (a, b) => ExtMath.numEquals(a, b);
 
+let propIdentifiers: string[] = [];
+let arrIdentifiers: string[] = [];
+const idArr = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_=";
+
+const getNextArrId = () => {
+    let res = '';
+
+    do {
+        res = '';
+        for (let i = 0; i < 50; i++) {
+            res += idArr[Math.floor(Math.random() * idArr.length)];
+        }
+    }
+    while (arrIdentifiers.includes(res));
+
+    arrIdentifiers.push(res);
+
+    return res;
+}
+const getNextPropId = () => {
+    let res = '';
+
+    do {
+        res = '';
+        for (let i = 0; i < 50; i++) {
+            res += idArr[Math.floor(Math.random() * idArr.length)];
+        }
+    }
+    while (propIdentifiers.includes(res));
+
+    propIdentifiers.push(res);
+
+    return res;
+}
+
 export interface property<T> {
     get value(): T;
     set value(val: T);
@@ -32,6 +67,18 @@ export class valueProperty<T> implements property<T> {
     public constructor(initialValue: T, public readonly equator: equator<T> = defaultEquator) {
         this._value = initialValue;
         this.equator = equator;
+        (this as any)[getNextPropId()] = true; // Gives each property special property, so it can be identified as one
+    }
+
+    public static fromObject<T>(obj: any): valueProperty<T> {
+        let names = Object.getOwnPropertyNames(obj)
+            .filter(v => v.length === 50)
+            .filter(v => propIdentifiers.includes(v));
+
+        if (names.length >= 1) {
+            return obj as valueProperty<T>;
+        }
+        else throw new Error("Given object is not a value property.");
     }
 }
 
@@ -98,5 +145,17 @@ export class arrayProperty<T> implements property<T[]> {
 
     public constructor(public readonly equator: equator<T> = defaultEquator) {
         this.equator = equator;
+        (this as any)[getNextArrId()] = true; // Gives each property special property, so it can be identified as one
+    }
+
+    public static fromObject<T>(obj: any): arrayProperty<T> {
+        let names = Object.getOwnPropertyNames(obj)
+            .filter(v => v.length === 50)
+            .filter(v => arrIdentifiers.includes(v));
+
+        if (names.length >= 1) {
+            return obj as arrayProperty<T>;
+        }
+        else throw new Error("Given object is not an array property.");
     }
 }

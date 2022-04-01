@@ -5,9 +5,9 @@
             "x": 500,
             "y": 1000
         },
-        "normalSrc": "/static/images/planets/normal/planet-1.png",
-        "colonySrc": "/static/images/planets/colony/planet-1.png",
-        "selectedSrc": "/static/images/planets/selected/planet-1.png",
+        "normalSrc": "planets/normal/planet-1.png",
+        "colonySrc": "planets/colony/planet-1.png",
+        "selectedSrc": "planets/selected/planet-1.png",
         "limit": 0.420,
         "prodPerCapita": 100
     },
@@ -17,9 +17,9 @@
             "x": 1500,
             "y": 500
         },
-        "normalSrc": "/static/images/planets/normal/planet-2.png",
-        "colonySrc": "/static/images/planets/colony/planet-2.png",
-        "selectedSrc": "/static/images/planets/selected/planet-2.png",
+        "normalSrc": "planets/normal/planet-2.png",
+        "colonySrc": "planets/colony/planet-2.png",
+        "selectedSrc": "planets/selected/planet-2.png",
         "limit": 6.900,
         "prodPerCapita": 500
     },
@@ -29,9 +29,9 @@
             "x": -500,
             "y": 200
         },
-        "normalSrc": "/static/images/planets/normal/planet-3.png",
-        "colonySrc": "/static/images/planets/colony/planet-3.png",
-        "selectedSrc": "/static/images/planets/selected/planet-3.png",
+        "normalSrc": "planets/normal/planet-3.png",
+        "colonySrc": "planets/colony/planet-3.png",
+        "selectedSrc": "planets/selected/planet-3.png",
         "limit": 0.350,
         "prodPerCapita": 5000
     },
@@ -41,9 +41,9 @@
             "x": -100,
             "y": -500
         },
-        "normalSrc": "/static/images/planets/normal/planet-4.png",
-        "colonySrc": "/static/images/planets/colony/planet-4.png",
-        "selectedSrc": "/static/images/planets/selected/planet-4.png",
+        "normalSrc": "planets/normal/planet-4.png",
+        "colonySrc": "planets/colony/planet-4.png",
+        "selectedSrc": "planets/selected/planet-4.png",
         "limit": 10.000,
         "prodPerCapita": 2500
     },
@@ -53,9 +53,9 @@
             "y": 0
         },
         "name": "Saaron",
-        "normalSrc": "/static/images/planets/normal/planet-5.png",
-        "colonySrc": "/static/images/planets/colony/planet-5.png",
-        "selectedSrc": "/static/images/planets/selected/planet-5.png",
+        "normalSrc": "planets/normal/planet-5.png",
+        "colonySrc": "planets/colony/planet-5.png",
+        "selectedSrc": "planets/selected/planet-5.png",
         "limit": 2,
         "prodPerCapita": 20000
     },
@@ -65,9 +65,9 @@
             "y": -800
         },
         "name": "Atrox",
-        "normalSrc": "/static/images/planets/normal/planet-6.png",
-        "colonySrc": "/static/images/planets/colony/planet-6.png",
-        "selectedSrc": "/static/images/planets/selected/planet-6.png",
+        "normalSrc": "planets/normal/planet-6.png",
+        "colonySrc": "planets/colony/planet-6.png",
+        "selectedSrc": "planets/selected/planet-6.png",
         "limit": 0.690,
         "prodPerCapita": 800
     },
@@ -77,9 +77,9 @@
             "y": -500
         },
         "name": "Aquantis",
-        "normalSrc": "/static/images/planets/normal/planet-7.png",
-        "colonySrc": "/static/images/planets/colony/planet-7.png",
-        "selectedSrc": "/static/images/planets/selected/planet-7.png",
+        "normalSrc": "planets/normal/planet-7.png",
+        "colonySrc": "planets/colony/planet-7.png",
+        "selectedSrc": "planets/selected/planet-7.png",
         "limit": 1.500,
         "prodPerCapita": 800
     },
@@ -89,9 +89,9 @@
             "y": 500
         },
         "name": "Gulacio",
-        "normalSrc": "/static/images/planets/normal/planet-8.png",
-        "colonySrc": "/static/images/planets/colony/planet-8.png",
-        "selectedSrc": "/static/images/planets/selected/planet-8.png",
+        "normalSrc": "planets/normal/planet-8.png",
+        "colonySrc": "planets/colony/planet-8.png",
+        "selectedSrc": "planets/selected/planet-8.png",
         "limit": 15.000,
         "prodPerCapita": 1600
     }
