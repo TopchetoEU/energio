@@ -1,11 +1,13 @@
-import { valueProperty } from "./props/property";
+import { gameObject } from "./gameObject";
+import { property } from "./props/property";
 
-export interface energyConsumer {
-    consumption: valueProperty<number>;
+export interface energyConsumer extends gameObject {
+    readonly consumption: number;
+    readonly optionalConsumer: boolean;
 }
 
-export interface energyProducer {
-    production: valueProperty<number>;
+export interface energyProducer extends gameObject {
+    readonly production: number;
 }
 
 export interface energyUnit extends energyProducer, energyConsumer {

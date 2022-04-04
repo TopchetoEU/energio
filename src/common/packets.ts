@@ -12,4 +12,6 @@ export enum packetCode {
     CONTROL,
     SHIPCONTROL,
     TICK,
+    EFFECT,
+    ENDEFFECT,
 }

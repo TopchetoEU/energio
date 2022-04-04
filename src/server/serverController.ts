@@ -6,34 +6,39 @@ import { packetCode } from "../common/packets";
 import { controlPacketData, controlType, loginPacketData, logoutPacketData as logoffPacketData, shipControlPacketData } from "../common/packets/client";
 import { serverSocket } from "./serverSocket";
 import { connect, first } from "rxjs";
-import { gameConfig, planetConfig } from "./gameConfig";
+import { gameConfig, locatedPlanetConfig } from "./gameConfig";
 import { vector } from "../common/vector";
 import { serverPlanet } from "./serverPlanet";
 import { player, playersOwner } from "../common/player";
 import { planet, planetsOwner } from "../common/planet";
-import { arrayProperty } from "../common/props/property";
 import { tickPacketData } from "../common/packets/server";
-import { arrayChangeTracker } from "../common/props/changeTracker";
+import { register, registerChangeTracker, registerProperty } from "../common/props/register";
+import { afterConstructor, constructorExtender, getProperty } from "../common/props/decorators";
+import { defaultEquator } from "../common/props/property";
+import { NIL } from "uuid";
+import { physicsEngine } from "./physics/physicsEngine";
 
 interface context {
     connection: ws.connection;
     player?: serverPlayer,
 }
 
-const TIMEOUT = 2000;
+const TIMEOUT = 200000;
 
+@constructorExtender()
 export class serverController implements playersOwner, planetsOwner {
-    public planets = new arrayProperty<planet>();
-    public players = new arrayProperty<player>();
+    public readonly planets = new register<planet>();
+    public readonly players = new register<player>();
+    public readonly physics = new physicsEngine();
 
-    private planetsTracker = new arrayChangeTracker(this.planets);
-    private playersTracker = new arrayChangeTracker(this.players);
-    private httpServer: http.Server;
-    private wsServer: ws.server;
+    private _planetsTracker = new registerChangeTracker(new registerProperty(this.planets, (a, b) => a.id === b.id));
+    private _playersTracker = new registerChangeTracker(new registerProperty(this.players, (a, b) => a.id === b.id));
+    public readonly httpServer: http.Server;
+    public readonly wsServer: ws.server;
 
     private onControl(player: serverPlayer): (packet: controlPacketData) => void {
         return packet => {
-            if (packet.type === controlType.Forward) player.moving.value = packet.starting;
+            if (packet.type === controlType.Forward) player.moving = packet.starting;
             else if (packet.starting) {
                 if (packet.type === controlType.Left) player.rotationDirection--;
                 else if (packet.type === controlType.Right) player.rotationDirection++;
@@ -54,68 +59,80 @@ export class serverController implements playersOwner, planetsOwner {
         };
     }
     private onShipControl(player: serverPlayer): (packet: shipControlPacketData) => void {
-        return packet => {
+        return async packet => {
             if (packet.count <= 0) return;
-            if (!player.selectedPlanet.value) return;
+            if (!player.selectedPlanet) return;
 
-            let planet = player.selectedPlanet.value;
+            let planet = player.selectedPlanet;
+
+            if (player.selectedPlanet.owner !== void 0 && player.selectedPlanet.owner?.id !== player.id) {
+                await player.connection.sendError("This is not your planet.", "Don't try to cheese the system");
+                return;
+            }
 
             if (packet.leave) {
-                if (planet.owner.value && planet.owner.value !== player) {
+                if (planet.owner && planet.owner !== player) {
                     player.connection.sendError("Players may be left only at owned colonies or non-colonized planets.");
                     return;
                 }
 
-                packet.count = Math.min(planet.limit - planet.population.value, player.peopleAboard.value, packet.count);
+                packet.count = Math.min(planet.limit - planet.population, player.peopleAboard, packet.count);
 
-                planet.population.value += packet.count;
-                player.peopleAboard.value -= packet.count;
+                planet.population += packet.count;
+                player.peopleAboard -= packet.count;
 
-                planet.owner.value = player;
+                planet.owner = player;
             }
             else {
-                packet.count = Math.min(planet.population.value, packet.count);
+                packet.count = Math.min(planet.population, packet.count);
                 
-                planet.population.value -= packet.count;
-                player.peopleAboard.value += packet.count;
+                planet.population -= packet.count;
+                player.peopleAboard += packet.count;
 
-                if (planet.population.value < 0.000001) 
-                    planet.owner.value = undefined;
+                if (planet.population < 0.000001) 
+                    planet.owner = undefined;
             }
         };
     }
 
     private genTick(player: serverPlayer): tickPacketData {
-        const planetsChange = this.planetsTracker.changeDescriptor;
-        const playersChange = this.playersTracker.changeDescriptor;
-        return {
+        const planetsChange = this._planetsTracker.changeDescriptor;
+        const playersChange = this._playersTracker.changeDescriptor;
+        let desc: tickPacketData = {
             delta: this.delta,
-            newPlayers: playersChange.added.map(v => (v as serverPlayer).creationData),
-            newPlanets: planetsChange.added.map(v => (v as serverPlanet).creationData),
-            deletedPlayers: playersChange.removed.map(v => v.id),
-            deletedPlanets: planetsChange.removed.map(v => v.id),
-            selectedPlanetId: player.selectedPlanet.value?.id ?? -1,
-            updatedPlanets: this.planets.value.map(v => ({ id: v.id, changes: (v as serverPlanet).tracker.changeDescriptor })),
-            updatedPlayers: this.players.value.map(v => ({ id: v.id, changes: (v as serverPlayer).tracker.changeDescriptor })),
+            newPlayers: playersChange?.added?.map(v => ({ ...(v as serverPlayer).tracker.initDescriptor, id: v.id }) ),
+            newPlanets: planetsChange?.added?.map(v => ({ ...(v as serverPlanet).tracker.initDescriptor, id: v.id }) ),
+            deletedPlayers: playersChange?.removed?.map(v => v.id),
+            deletedPlanets: planetsChange?.removed?.map(v => v.id),
+            selectedPlanetId: player.selectedPlanet?.id ?? NIL,
+            updatedPlanets: this.planets.map(v => ({ id: v.id, changes: (v as serverPlanet).tracker.changeDescriptor })),
+            updatedPlayers: this.players.map(v => ({ id: v.id, changes: (v as serverPlayer).tracker.changeDescriptor })),
         };
+
+        if (desc.updatedPlanets?.length === 0) desc.updatedPlanets = undefined;
+        if (desc.updatedPlanets?.length === 0) desc.updatedPlanets = undefined;
+
+        return desc;
     }
     private genInitTick(player: serverPlayer): tickPacketData {
-        const planetsChange = this.planets.value;
-        const playersChange = this.players.value;
+        const planetsChange = this.planets;
+        const playersChange = this.players;
 
-        return {
+        let desc: tickPacketData = {
             delta: this.delta,
-            newPlayers: playersChange.map(v => (v as serverPlayer).creationData),
-            newPlanets: planetsChange.map(v => (v as serverPlanet).creationData),
-            deletedPlayers: playersChange.map(v => v.id),
-            deletedPlanets: planetsChange.map(v => v.id),
-            selectedPlanetId: player.selectedPlanet.value?.id ?? -1,
-            updatedPlanets: this.planets.value.map(v => ({ id: v.id, changes: (v as serverPlanet).tracker.initDescriptor })),
-            updatedPlayers: this.players.value.map(v => ({ id: v.id, changes: (v as serverPlayer).tracker.initDescriptor })),
+            selectedPlanetId: player.selectedPlanet?.id ?? NIL,
+            newPlayers: playersChange.map(v => ({ ...(v as serverPlayer).tracker.initDescriptor, id: v.id })),
+            newPlanets: planetsChange.map(v => ({ ...(v as serverPlanet).tracker.initDescriptor, id: v.id })),
         };
+    
+        if (desc.newPlayers?.length === 0) desc.newPlayers = undefined;
+        if (desc.newPlanets?.length === 0) desc.newPlanets = undefined;
+
+        return desc;
     }
 
     private update() {
+        this.physics.update(this.delta);
         this.players.forEach(v => {
             (v as serverPlayer).update(this.delta);
         });
@@ -125,39 +142,44 @@ export class serverController implements playersOwner, planetsOwner {
     }
 
     private async syncOne(player: serverPlayer) {
-        player.connection.sendPacket(packetCode.TICK, this.genTick(player));
+        try {
+            await player.connection.sendPacket(packetCode.TICK, this.genTick(player));
+        }
+        catch {
+            console.log("bruh");
+        }
     }
     private async init(player: serverPlayer) {
-        player.connection.sendPacket(packetCode.INIT, { selfId: player.id });
-        player.connection.sendPacket(packetCode.TICK, this.genInitTick(player));
+        await player.connection.sendPacket(packetCode.INIT, { selfId: player.id });
+        await player.connection.sendPacket(packetCode.TICK, this.genInitTick(player));
     }
 
     private async sync() {
-        for (let v of this.players.value) {
-            this.syncOne(v as serverPlayer);
+        for (let v of this.players.array) {
+            await this.syncOne(v as serverPlayer);
         }
-        this.planetsTracker.clearChanges();
-        this.playersTracker.clearChanges();
+        this._planetsTracker.reset();
+        this._playersTracker.reset();
 
-        this.planets.forEach(v => (v as serverPlanet).tracker.clearChanges());
-        this.players.forEach(v => (v as serverPlayer).tracker.clearChanges());
+        this.planets.forEach(v => (v as serverPlanet).tracker.reset());
+        this.players.forEach(v => (v as serverPlayer).tracker.reset());
     }
 
     private async login(connection: packetConnection, name: string, location: vector, direction: number): Promise<serverPlayer> {
-        if (this.players.value.find(v => v.name === name)) throw Error("Already logged in.");
+        if (this.players.find(v => v.name === name) !== void 0) throw Error("Already logged in.");
 
-        const player = new serverPlayer(this, name, connection, location, direction);
+        const player = new serverPlayer(name, connection, location, direction);
         this.players.add(player);
 
-        this.init(player);
+        await this.init(player);
 
         return player;
     }
     private async logout(player: serverPlayer, reason?: string | undefined): Promise<void> {
         this.players.removeIf(v => v.id === player.id);
 
-        for (let planet of player.ownedPlanets.value) {
-            planet.owner.value = undefined;
+        for (let planet of player.ownedPlanets.array) {
+            planet.owner = undefined;
         }
 
         if (!player.connection.connection.closed) {
@@ -165,16 +187,14 @@ export class serverController implements playersOwner, planetsOwner {
             player.connection.close();
         }
     }
-    public getPlayer(id: number): player | null {
-        return this.players.value.find(v => v.id === id) ?? null;
+    public getPlayer(id: string): player | null {
+        return this.players.find(v => v.id === id) ?? null;
     }
 
     private getPlanetLocation() {
         let loc: vector = vector.zero;
 
-        // return loc;
-
-        for (let startLoc of this.planets.value.map(v => v.location)) {
+        for (let startLoc of this.planets.map(v => v.location)) {
             let ok = false;
 
             ok = true;
@@ -184,9 +204,9 @@ export class serverController implements playersOwner, planetsOwner {
                 loc = startLoc.add(vector.fromDirection(Math.random() * 1500).multiply(Math.random() * 1500));
                 dir += 1;
                 
-                for (let planet of this.planets.value) {
+                for (let planet of this.planets.array) {
                     let dist = planet.location.distance(loc);
-                    if (dist < 750) {
+                    if (dist < 500) {
                         ok = false;
                         break;
                     }
@@ -200,16 +220,22 @@ export class serverController implements playersOwner, planetsOwner {
 
     constructor(port: number, config: gameConfig, private delta: number) {
         this.httpServer = http.createServer();
-        this.httpServer.on('listening', () => console.log("Listening to :8001"));
-        this.httpServer.on('error', err => console.error(err));
-        this.httpServer.listen(port);
         this.wsServer = new ws.server({
             httpServer: this.httpServer
         });
+        this.httpServer.on('listening', () => console.log("Listening to :8001"));
+        this.httpServer.on('error', err => console.error(err));
+        this.httpServer.listen(port);
 
-        config.planets.forEach(v => {
-            this.planets.add(new serverPlanet({ ...v, location: this.getPlanetLocation() }, this));
-        });
+        this.players.onAdd.subscribe(v => this.physics.objects.add(v as serverPlayer));
+        this.players.onRemove.subscribe(v => this.physics.objects.remove(v as serverPlayer));
+
+        this.planets.onAdd.subscribe(v => this.physics.objects.add(v as serverPlanet));
+        this.planets.onRemove.subscribe(v => this.physics.objects.remove(v as serverPlanet));
+
+        for (let planet of config.planets) {
+            this.planets.add(new serverPlanet({ ...planet, location: this.getPlanetLocation() }));
+        }
 
         this.wsServer.on('request', async req => {
             const socket = new serverSocket(req.accept());
@@ -228,7 +254,7 @@ export class serverController implements playersOwner, planetsOwner {
                     let rot = Math.random() * 360;
 
                     try {
-                        player = await this.login(con, packet.data.name, loc, rot);
+                        player = await this.login(con, packet.data.name, loc.add(vector.fromDirection(Math.random() * Math.PI * 2).multiply(200)), rot);
                     }
                     catch {
                         await con.sendError("Player already logged in", "Try changing your username.");
@@ -236,10 +262,10 @@ export class serverController implements playersOwner, planetsOwner {
                         return;
                     }
                     
-                    let planet = new serverPlanet({ ...config.starter, location: loc }, this);
+                    let planet = new serverPlanet({ ...config.starter, location: loc });
                     this.planets.add(planet);
-                    planet.population.value = planet.limit;
-                    planet.owner.value = player;
+                    planet.population = planet.limit;
+                    planet.owner = player;
 
                     socket.onClose.pipe(first()).subscribe(() => this.logout(player as serverPlayer));
                     con.onPacket<logoffPacketData>(packetCode.LOGOFF).subscribe(v => this.onLogoff(player)(v.data));
@@ -251,13 +277,14 @@ export class serverController implements playersOwner, planetsOwner {
                 console.log(e);
                 con.sendError(e.message ?? 'Generic error.', e.description);
                 con.connection.close();
-                console.log("User failed to provide correct packages.");
+                console.log("User failed to provide correct packets.");
             }
         });
 
         setInterval(() => {
             this.update();
             this.sync();
-        }, delta * 1000);
+        }, this.delta * 1000);
+
     }
 }

@@ -1,5 +1,5 @@
 import { point } from "./packets";
-import { translator } from "./props/changeTracker";
+import { translator, translators } from "./props/translator";
 
 export const EPSILON = 0.0001;
 
@@ -13,6 +13,10 @@ export const ExtMath = {
     },
     lerp(src: number, dest: number, gradient: number) {
         return src * (1 - gradient) + dest * gradient;
+    },
+    squareSum(a: number, b: number) {
+         // I knew I'd need this
+        return a * a + 2 * a * b + b * b;
     }
 }
 
@@ -58,6 +62,13 @@ export class vector {
     }
     public invert(): vector {
         return new vector(-this.x, -this.y);
+    }
+    public dot(other: vector): number {
+        return this.x * other.x + this.y * other.y;
+    }
+
+    public absolute(): vector {
+        return new vector(Math.abs(this.x), Math.abs(this.y));
     }
 
     public distance(other: vector) {
@@ -138,8 +149,7 @@ export class vector {
         return new vector(point.x, point.y);
     }
 
-    public static readonly pointTranslator: translator<vector, point> = {
-        translateFrom: v => vector.fromPoint(v),
-        translateTo: v => v
-    };
+    public static readonly pointTranslator = translators<vector, point>()
+        .from(v => new vector(v.x, v.y))
+        .to(v => ({ x: v.x, y: v.y }));
 }

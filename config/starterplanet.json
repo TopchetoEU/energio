@@ -4,5 +4,10 @@
     "colonySrc": "planets/colony/starter.png",
     "selectedSrc": "planets/selected/starter.png",
     "limit": 20,
-    "prodPerCapita": 100
+    "prodPerCapita": 100,
+    "diameter": 250,
+    "offset": {
+        "x": 127.5,
+        "y": 127.5
+    }
 }

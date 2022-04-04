@@ -1,36 +1,23 @@
-import { playerCreateData } from "../common/packets/server";
-import { planet, planetsOwner } from "../common/planet";
+import { point } from "../common/packets";
+import { planet } from "../common/planet";
 import { player } from "../common/player";
-import { objectChangeApplier, translator } from "../common/props/changeTracker";
+import { appliableObject, objectChangeApplier, objectChangeDescriptor } from "../common/props/changes";
+import { afterConstructor, appliable, constructorExtender, propOwner } from "../common/props/decorators";
 import { ExtMath, vector } from "../common/vector";
-import { clientController, drawImage } from "./clientController";
-import { resources } from "./resources";
+import { drawImage } from "./clientController";
 import { transformStack } from "./transformStack";
 
-export class clientPlayer extends player {
+@constructorExtender()
+@appliable()
+@propOwner()
+export class clientPlayer extends player implements appliableObject {
+    public readonly name!: string;
+    public readonly applier = new objectChangeApplier(this);
     public prevLocation: vector;
     public prevDirection: number;
 
-    public readonly planetTranslator: translator<number, planet> = {
-        translateFrom: v => v.id,
-        translateTo: v => {
-            let res = this.planetOwner.planets.value.find(_v => _v.id === v);
-            if (res) return res;
-            else throw new Error("Invalid planet given.");
-        },
-    };
-
-    public readonly applier = new objectChangeApplier()
-        // .prop('ownedPlanets', true, this.planetTranslator)
-        .prop('peopleAboard')
-        .prop('location', vector.pointTranslator)
-        .prop('direction')
-        .prop('moving')
-        .prop('production')
-        .prop('consumption');
-
     private get rocketImg(): string {
-        return '/static/images/player.png';
+        return 'player.png';
     }
 
     private async drawRocket(canvas: CanvasRenderingContext2D, stack: transformStack, rotation: number) {
@@ -48,20 +35,20 @@ export class clientPlayer extends player {
         canvas.fillStyle = '#fff';
         canvas.strokeStyle = '3px solid #000';
         canvas.textAlign = 'center';
-        canvas.font = 'bolder'
+        canvas.font = 'bolder 20px';
 
         canvas.fillText(this.name, 0, 0);
-        // canvas.strokeText(this.name, 0, 0);
+        canvas.strokeText(this.name, 0, 0);
         
-        // canvas.stroke();
+        canvas.stroke();
         canvas.fill();
     }
 
     public async draw(canvas: CanvasRenderingContext2D, stack: transformStack, clientRotation: number, tickDelta: number) {
         stack.begin();
 
-        let lerpedLoc = this.prevLocation.lerp(this.location.value, tickDelta);
-        let lerpedDir = ExtMath.lerp(this.prevDirection, this.direction.value, tickDelta);
+        let lerpedLoc = this.prevLocation.lerp(this.location, tickDelta);
+        let lerpedDir = ExtMath.lerp(this.prevDirection, this.direction, tickDelta);
 
         stack.translate(lerpedLoc);
 
@@ -71,10 +58,15 @@ export class clientPlayer extends player {
         stack.end();
     }
 
-    public constructor(planetOwner: planetsOwner, packet: playerCreateData) {
-        super(planetOwner, packet.name, packet.id, vector.fromPoint(packet.location), packet.direction);
+    public constructor(packet: objectChangeDescriptor) {
+        super(packet.id, vector.fromPoint(packet.location as point), packet.direction);
 
-        this.prevDirection = this.direction.value;
-        this.prevLocation = this.location.value;
+        this.prevDirection = this.direction;
+        this.prevLocation = this.location;
+    }
+
+    @afterConstructor()
+    private _afterConstr(packet: objectChangeDescriptor) {
+        this.applier.apply(packet);
     }
 }

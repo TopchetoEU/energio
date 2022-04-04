@@ -1,6 +1,6 @@
 import { point } from "../packets";
-import { objectChangeDescriptor } from "../props/changeTracker";
-
+import { objectChangeDescriptor } from "../props/changes";
+import { NIL } from "uuid";
 
 /**
  * An enum of all possible kick reasons
@@ -12,50 +12,50 @@ export enum kickReason {
     AdminKick,
 }
 
-/**
- * Initialization data for a newly created player
- */
-export interface playerCreateData {
-    /**
-     * The location of the player
-     */
-    location: point;
-    /**
-     * The direction of the player
-     */
-    direction: number;
-    /**
-     * The name of the player
-     */
-    name: string;
-    /**
-     * The id of the player
-     */
-    id: number;
-}
-/**
- * Initialization data for a newly created planet
- */
-export interface planetCreateData {
-    id: number;
-    name: string;
-    limit: number;
+// /**
+//  * Initialization data for a newly created player
+//  */
+// export interface playerCreateData {
+//     /**
+//      * The location of the player
+//      */
+//     location: point;
+//     /**
+//      * The direction of the player
+//      */
+//     direction: number;
+//     /**
+//      * The name of the player
+//      */
+//     name: string;
+//     /**
+//      * The id of the player
+//      */
+//     id: string;
+// }
+// /**
+//  * Initialization data for a newly created planet
+//  */
+// export interface planetCreateData {
+//     id: string;
+//     name: string;
+//     limit: number;
 
-    normalSrc: string;
-    colonySrc: string;
-    selectedSrc: string;
+//     normalSrc: string;
+//     colonySrc: string;
+//     selectedSrc: string;
 
-    productionPerCapita: number;
+//     productionPerCapita: number;
 
-    location: point;
-}
+//     location: point;
+// }
 
 /**
  * Data, used to update a player on the client-side.
  * Sent by the server
  */
 export interface playerUpdateData {
-    id: number;
+    id: string;
     changes: objectChangeDescriptor;
 }
 /**
@@ -63,10 +63,9 @@ export interface playerUpdateData {
  * Sent by the server
  */
 export interface planetUpdateData {
-    id: number;
+    id: string;
     changes: objectChangeDescriptor;
 }
-
 
 /**
  * A packet, sent by the server each tick. It contains changes in
@@ -78,41 +77,41 @@ export interface tickPacketData {
      * An array, containing all changes, that were made to all
      * visible players since the last tick
      */
-    updatedPlayers: playerUpdateData[];
+    updatedPlayers?: playerUpdateData[];
     /**
      * An array, containing all changes, that were made to all
      * visible planets since the last tick
      */
-    updatedPlanets: planetUpdateData[];
+    updatedPlanets?: planetUpdateData[];
     /**
      * An array, containing initialization data for all
      * players, that were created since the last tick, or
      * entered view distance
      */
-    newPlayers: playerCreateData[];
+    newPlayers?: objectChangeDescriptor[];
     /**
      * An array, containing initialization data for all
      * planets, that were created since the last tick, or
      * entered view distance
      */
-    newPlanets: planetCreateData[];
+    newPlanets?: objectChangeDescriptor[];
     /**
      * An array, containing the IDs of all players, that
      * were removed since the last tick, or exited view
      * distance
      */
-    deletedPlayers: number[];
+    deletedPlayers?: string[];
     /**
      * An array, containing the IDs of all planets, that
      * were removed since the last tick, or exited view
      * distance
      */
-    deletedPlanets: number[];
+    deletedPlanets?: string[];
     /**
      * The id of the currently selected planet (closest planet to
      * the player). If none, it will be -1
      */
-    selectedPlanetId: number | -1;
+    selectedPlanetId?: string | typeof NIL;
     /**
      * The time elapsed since last tick (generally the length of
      * the tick, but there might be variation depending on the
@@ -141,9 +140,98 @@ export interface kickPacketData {
  * A packet, sent by the server as a response to
  * a login request
  */
- export interface initPacketData {
+export interface initPacketData {
     /**
      * The ID with which the client's player will be identified
      */
-    selfId: number;
+    selfId: string;
+}
+
+
+/**
+ * A subset of the effectPacketData, sent by the server,
+ * whenever a laser effect is being played. Only this effect
+ * may get ended and the client must draw these
+ */
+export interface laserPacketData {
+    /**
+     * The type of the effect. In this case, a laser
+     */
+    type: 'laser';
+    /**
+     * The id of the laser
+     */
+    id: string;
+    /**
+     * The location at which the laser was shot
+     */
+    location: point;
+    /**
+     * The velocity of the laser
+     */
+    velocity: point;
+    /**
+     * The size (width, in pixels) of the laser
+     */
+    size: number;
+    /**
+     * The color of the laser
+     */
+    color: { r: number, g: number, b: number }
+    /**
+     * The decay (per second, gigawatts) of the laser.
+     * If the power of the laser reaches 0, the laser will automatically be destroyed
+     */
+    decay: number;
+    /**
+     * The power (gigawatts) of the laser
+     */
+    power: number;
+}
+/**
+ * A subset of the effectPacketData, sent by the server,
+ * whenever particle effects should be played. The client
+ * may not draw these, for performance reasons
+ */
+export enum particleType {
+    Fuel,
+    WeaponCharge,
+    ShipsBump,
+    LaserHit,
+}
+export interface particlePacketData {
+    /**
+     * The type of the effect. In this case, a particle
+     */
+    type: 'particle';
+    /**
+     * The id of the particle
+     */
+    id: string;
+    /**
+     * The location at which the particles were created
+     */
+    location: point;
+    /**
+     * The type of the particle
+     */
+    particleType: particleType;
+    /**
+     * The size of the area in which the particles will be spawned
+     */
+    size: number;
+}
+
+/**
+ * A packet sent by the server when an effect should
+ * be played
+ */
+export type effectPacketData = particlePacketData | laserPacketData;
+
+/**
+ * A packet sent by the client when an effect should
+ * be stopped and freed
+ */
+export interface stopEffectPacketData {
+    id: string;
 }

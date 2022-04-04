@@ -1,10 +1,11 @@
 [
     {
         "name": "Titania",
-        "location": {
-            "x": 500,
-            "y": 1000
+        "offset": {
+            "x": 239,
+            "y": 248
         },
+        "diameter": 422,
         "normalSrc": "planets/normal/planet-1.png",
         "colonySrc": "planets/colony/planet-1.png",
         "selectedSrc": "planets/selected/planet-1.png",
@@ -13,10 +14,11 @@
     },
     {
         "name": "Gaya",
-        "location": {
-            "x": 1500,
-            "y": 500
+        "offset": {
+            "x": 209,
+            "y": 208
         },
+        "diameter": 211,
         "normalSrc": "planets/normal/planet-2.png",
         "colonySrc": "planets/colony/planet-2.png",
         "selectedSrc": "planets/selected/planet-2.png",
@@ -25,10 +27,11 @@
     },
     {
         "name": "Natar",
-        "location": {
-            "x": -500,
-            "y": 200
+        "offset": {
+            "x": 304,
+            "y": 152
         },
+        "diameter": 213,
         "normalSrc": "planets/normal/planet-3.png",
         "colonySrc": "planets/colony/planet-3.png",
         "selectedSrc": "planets/selected/planet-3.png",
@@ -37,10 +40,11 @@
     },
     {
         "name": "Atlas",
-        "location": {
-            "x": -100,
-            "y": -500
+        "offset": {
+            "x": 150,
+            "y": 150
         },
+        "diameter": 294,
         "normalSrc": "planets/normal/planet-4.png",
         "colonySrc": "planets/colony/planet-4.png",
         "selectedSrc": "planets/selected/planet-4.png",
@@ -48,11 +52,12 @@
         "prodPerCapita": 2500
     },
     {
-        "location": {
-            "x": 0,
-            "y": 0
-        },
         "name": "Saaron",
+        "offset": {
+            "x": 82,
+            "y": 83
+        },
+        "diameter": 156,
         "normalSrc": "planets/normal/planet-5.png",
         "colonySrc": "planets/colony/planet-5.png",
         "selectedSrc": "planets/selected/planet-5.png",
@@ -60,11 +65,12 @@
         "prodPerCapita": 20000
     },
     {
-        "location": {
-            "x": 1000,
-            "y": -800
-        },
         "name": "Atrox",
+        "offset": {
+            "x": 143,
+            "y": 152
+        },
+        "diameter": 252,
         "normalSrc": "planets/normal/planet-6.png",
         "colonySrc": "planets/colony/planet-6.png",
         "selectedSrc": "planets/selected/planet-6.png",
@@ -72,11 +78,12 @@
         "prodPerCapita": 800
     },
     {
-        "location": {
-            "x": -2000,
-            "y": -500
-        },
         "name": "Aquantis",
+        "offset": {
+            "x": 79,
+            "y": 81
+        },
+        "diameter": 153,
         "normalSrc": "planets/normal/planet-7.png",
         "colonySrc": "planets/colony/planet-7.png",
         "selectedSrc": "planets/selected/planet-7.png",
@@ -84,11 +91,12 @@
         "prodPerCapita": 800
     },
     {
-        "location": {
-            "x": 200,
-            "y": 500
-        },
         "name": "Gulacio",
+        "offset": {
+            "x": 111,
+            "y": 110
+        },
+        "diameter": 216,
         "normalSrc": "planets/normal/planet-8.png",
         "colonySrc": "planets/colony/planet-8.png",
         "selectedSrc": "planets/selected/planet-8.png",

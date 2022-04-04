@@ -165,7 +165,7 @@ export class packetConnection {
 
     // private processedIds: number[] = [];
 
-    public constructor(connection: socket, timeout: number = 1000) {
+    public constructor(connection: socket, timeout: number = 100000) {
         this._timeout = timeout;
         this._socket = connection;
 

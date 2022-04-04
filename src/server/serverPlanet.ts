@@ -1,67 +1,58 @@
-import { packetCode } from "../common/packets";
-import { planetCreateData } from "../common/packets/server";
-import { planet, planetsOwner } from "../common/planet";
-import { player, playersOwner } from "../common/player";
+import { planet } from "../common/planet";
 import { ExtMath, vector } from "../common/vector";
-import { planetConfig } from "./gameConfig";
-import { serverPlayer } from "./serverPlayer";
-import { objectChangeTracker, trackableObject, translator } from "../common/props/changeTracker";
+import { locatedPlanetConfig } from "./gameConfig";
+import { objectChangeTracker, trackableObject } from "../common/props/changes";
+import { getNextObjId } from "./server";
+import { afterConstructor, constructorExtender, propOwner, trackable } from "../common/props/decorators";
+import { hitboxOwner } from "./physics/hitboxOwner";
+import { hitbox } from "./physics/hitbox";
 
 export const GROWTH_RATE = 0.005;
-let nextId = 0;
 
-export class serverPlanet extends planet implements trackableObject {
-    public readonly tracker: objectChangeTracker;
-    public readonly creationData: planetCreateData;
-    public readonly idTranslator: translator<player | undefined, number> = {
-        translateFrom: v => {
-            if (v < 0) return undefined;
-            let res = this.playersOwner.players.value.find(_v => _v.id === v);
-            if (res) return res;
-            else throw new Error("Invalid planet given.");
-        },
-        translateTo: v => {
-            return v?.id ?? -1;
-        }
-    };
+@constructorExtender()
+@trackable()
+@propOwner()
+export class serverPlanet extends planet implements trackableObject, hitboxOwner {
+    public readonly renderOffset: vector;
+    public readonly productionPerCapita: number;
+    public readonly limit: number;
+    public readonly normalSrc: string;
+    public readonly colonySrc: string;
+    public readonly selectedSrc: string;
+    public readonly name: string;
+    public production: number = 0;
+    public readonly consumption: number = this.productionPerCapita * this.population / 1000;
+    public readonly tracker = new objectChangeTracker(this);
+    public readonly hitbox: hitbox;
 
     public update(delta: number) {
         if (this.owner) {
-            this.population.value *= ExtMath.drag(GROWTH_RATE, delta);
-            this.production.value = this.productionPerCapita * this.population.value / 1000;
-            if (this.population.value > this.limit) this.population.value = this.limit;
+            this.population *= ExtMath.drag(GROWTH_RATE, delta);
+            if (this.population > this.limit) this.population = this.limit;
         }
         else {
-            this.population.value = 0;
+            this.population = 0;
         }
     }
 
-    constructor(config: planetConfig, playersOwner: playersOwner) {
-        super(playersOwner, ++nextId, config.prodPerCapita, config.limit, config.normalSrc, config.colonySrc, config.selectedSrc, config.name, new vector(config.location.x, config.location.y));
-        this.consumption.value = this.limit * this.productionPerCapita / 3000;
-        this.population.onChange.subscribe(v => {
-            this.productionPerCapita * v / 1000;
-            if (v < 0.0001) this.owner.value = undefined;
-        });
-        this.owner.onChange.subscribe(v => {
-            this.owner?.value?.ownedPlanets.remove(this);
-            v?.ownedPlanets.add(this);
-        });
+    constructor(config: locatedPlanetConfig) {
+        super(getNextObjId(), vector.fromPoint(config.location));
 
-        this.creationData = {
-            id: this.id,
-            name: this.name,
-            limit: this.limit,
-            normalSrc: this.normalSrc,
-            colonySrc: this.colonySrc,
-            selectedSrc: this.selectedSrc,
-            productionPerCapita: this.productionPerCapita,
-            location: this.location,
-        };
-        this.tracker = new objectChangeTracker(this)
-            .prop('owner', this.idTranslator)
-            .prop('population')
-            .prop('production')
-            .prop('consumption');
+        this.productionPerCapita = config.prodPerCapita;
+        this.limit = config.limit;
+        this.normalSrc = config.normalSrc;
+        this.colonySrc = config.colonySrc;
+        this.selectedSrc = config.selectedSrc;
+        this.name = config.name;
+        this.renderOffset = vector.fromPoint(config.offset);
+        this.hitbox = new hitbox(config.diameter);
+    }
+
+    @afterConstructor()
+    private _afterPropInit() {
+        this.populationChanged.subscribe(v => {
+            this.production = this.productionPerCapita * v / 1000;
+            if (v < 0.0001) this.owner = undefined;
+        });
     }
 }

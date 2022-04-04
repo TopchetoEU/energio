@@ -1,27 +1,29 @@
-import { planetCreateData } from "../common/packets/server";
+import { point } from "../common/packets";
 import { planet } from "../common/planet";
-import { player, playersOwner } from "../common/player";
-import { objectChangeApplier, translator } from "../common/props/changeTracker";
+import { playersOwner } from "../common/player";
+import { appliableObject, objectChangeApplier, objectChangeDescriptor } from "../common/props/changes";
+import { afterConstructor, appliable, constructorExtender, propOwner } from "../common/props/decorators";
 import { vector } from "../common/vector";
 import { drawImage } from "./clientController";
 import { transformStack } from "./transformStack";
+@constructorExtender()
+@appliable()
+@propOwner()
+export class clientPlanet extends planet implements appliableObject {
+    public readonly renderOffset!: vector;
+    public readonly productionPerCapita!: number;
+    public readonly limit!: number;
+    public readonly normalSrc!: string;
+    public readonly colonySrc!: string;
+    public readonly selectedSrc!: string;
+    public readonly name!: string;
 
-export class clientPlanet extends planet {
+    public readonly applier = new objectChangeApplier(this);
+
     public selected: boolean = false;
-    public readonly idTranslator: translator<number, player | undefined> = {
-        translateFrom: v => v?.id ?? -1,
-        translateTo: v => {
-            // if (v < 0) return undefined;
-            let res = this.playersOwner.players.value.find(_v => _v.id === v);
-            if (res) return res;
-            else throw new Error("Invalid planet given.");
-        },
-    };
-    public readonly applier = new objectChangeApplier()
-        .prop('owner', this.idTranslator)
-        .prop('population')
-        .prop('production')
-        .prop('consumption');
+    
+    public readonly production!: number;
+    public readonly consumption!: number;
 
     // public updateElement() {
     //     this.element.style.transform = `translate(${this.location.x}px, ${this.location.y}px)`;
@@ -36,28 +38,25 @@ export class clientPlanet extends planet {
 
     public async draw(selected: boolean, context: CanvasRenderingContext2D, stack: transformStack) {
         let src = this.normalSrc;
-        if (this.owner.value) {
+        if (this.owner) {
             if (selected) src = this.selectedSrc;
             else src = this.colonySrc;
         }
 
         stack.begin();
 
-        stack.translate(this.location);
-        await drawImage(context, src);
+        stack.translate(this.location.subtract(this.renderOffset));
+        await drawImage(context, src, false);
 
         stack.end();
     }
 
-    constructor(playersOwner: playersOwner, packet: planetCreateData) {
-        super(playersOwner, 
-            packet.id,
-            packet.productionPerCapita,
-            packet.limit,
-            packet.normalSrc, packet.colonySrc, packet.selectedSrc,
-            packet.name,
-            new vector(packet.location.x, packet.location.y)
-        );
-        // this.consumption = 
+    constructor(packet: objectChangeDescriptor) {
+        super(packet.id, vector.fromPoint(packet.location as point));
+    }
+
+    @afterConstructor()
+    private _afterConstr(packet: objectChangeDescriptor) {
+        this.applier.apply(packet);
     }
 }
