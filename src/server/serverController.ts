@@ -293,7 +293,7 @@ export class serverController implements playersOwner, planetsOwner {
         this.wsServer = new ws.server({
             httpServer: this.httpServer
         });
-        this.httpServer.on('listening', () => console.log("Listening to :8001"));
+        this.httpServer.on('listening', () => console.log("Listening to :" + port));
         this.httpServer.on('error', err => console.error(err));
         this.httpServer.listen(port);
 

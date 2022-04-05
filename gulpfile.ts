@@ -55,7 +55,7 @@ const client = (devMode = false, watch = false) => () => {
     );
 }
 const server = () => {
-    const tsPipe = (dir: string) => src(`src/${dir}/*.ts`)
+    const tsPipe = (dir: string) => src(`src/${dir}/**/*.ts`)
         .pipe(typescriptPipe(typescriptConf))
         .pipe(dest(`build/${dir}`), { end: true });
     return merge(tsPipe('server'), tsPipe('common'));
