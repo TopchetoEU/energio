@@ -15,7 +15,7 @@ updateSize();
 
 window.onresize = updateSize;
 
-(document.getElementById('playbtn') as HTMLElement).onclick = () => {
+document.getElementById('playbtn')!.onclick = () => {
     let ws = new WebSocket('ws://77.70.55.157:8002');
     ws.onopen = async () => {
         let socket = new clientSocket(ws);

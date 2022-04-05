@@ -1,8 +1,9 @@
 import { NIL } from "uuid";
 import { abstractConstructor, paramProp } from "./props/decorators";
 import { valProp } from "./props/property";
+import { register } from "./props/register";
 
-let objects: gameObject[] = [];
+let objects = new register<gameObject>();
 
 export class gameObject {
     public constructor(
@@ -11,7 +12,15 @@ export class gameObject {
         if (gameObjectManager.includes(id)) {
             throw new Error("Object with same ID already exists.");
         }
-        objects.push(this);
+        objects.add(this);
+    }
+
+    public remove() {
+        objects.remove(this);
+    }
+
+    public toString() {
+        return `${this.constructor.name}: ${this.id}`;
     }
 }
 
@@ -56,7 +65,7 @@ export const gameObjectManager = Object.freeze({
         }
     },
     getAll<T extends gameObject = gameObject>(type?: abstractConstructor<T>) {
-        if (type === void 0) return [ ...objects] as T[];
+        if (type === void 0) return objects.array as T[];
         else return objects.filter(v => v instanceof type) as T[];
     }
 });

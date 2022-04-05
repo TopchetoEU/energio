@@ -6,13 +6,14 @@ import { getNextObjId } from "./server";
 import { afterConstructor, constructorExtender, propOwner, trackable } from "../common/props/decorators";
 import { hitboxOwner } from "./physics/hitboxOwner";
 import { hitbox } from "./physics/hitbox";
+import { healthOwner } from "../common/healthOwner";
 
 export const GROWTH_RATE = 0.005;
 
 @constructorExtender()
 @trackable()
 @propOwner()
-export class serverPlanet extends planet implements trackableObject, hitboxOwner {
+export class serverPlanet extends planet implements trackableObject, hitboxOwner, healthOwner {
     public readonly renderOffset: vector;
     public readonly productionPerCapita: number;
     public readonly limit: number;
@@ -21,9 +22,19 @@ export class serverPlanet extends planet implements trackableObject, hitboxOwner
     public readonly selectedSrc: string;
     public readonly name: string;
     public production: number = 0;
-    public readonly consumption: number = this.productionPerCapita * this.population / 1000;
+    public readonly consumption: number;
     public readonly tracker = new objectChangeTracker(this);
     public readonly hitbox: hitbox;
+
+    public get health() {
+        return this.production;
+    }
+    public set health(val) {
+        let diff = this.health - val;
+        this.population -= diff / this.productionPerCapita * 1000;
+
+        // Play out damage effect
+    }
 
     public update(delta: number) {
         if (this.owner) {
@@ -40,6 +51,7 @@ export class serverPlanet extends planet implements trackableObject, hitboxOwner
 
         this.productionPerCapita = config.prodPerCapita;
         this.limit = config.limit;
+        this.consumption = this.productionPerCapita * this.limit / 1000 / 3;
         this.normalSrc = config.normalSrc;
         this.colonySrc = config.colonySrc;
         this.selectedSrc = config.selectedSrc;

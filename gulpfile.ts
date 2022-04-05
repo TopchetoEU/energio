@@ -40,6 +40,10 @@ const typescriptConf: typescriptConfig = {
     forceConsistentCasingInFileNames: true,
 };
 
+const style = () => 
+    src('src/style.scss')
+        .pipe(sassPipe(sass)())
+        .pipe(dest('static/css'), { end: true })
 const client = (devMode = false, watch = false) => () => {
     const conf = webpackConf(devMode, watch);
 
@@ -47,9 +51,7 @@ const client = (devMode = false, watch = false) => () => {
         src(conf.entry as string | string[])
             .pipe((webpackPipe as Function)(conf as any, webpack)) // stupid webpack dep bug
             .pipe(dest('static/js')),
-        src('src/style.scss')
-            .pipe(sassPipe(sass)())
-            .pipe(dest('static/css'), { end: true })
+        style()
     );
 }
 const server = () => {
@@ -73,4 +75,5 @@ const build = (devMode = false) => parallel(client(devMode), server);
 
 task('devel', build(true));
 task('prod', build(false));
+task('style', style);
 task('watch', watch);

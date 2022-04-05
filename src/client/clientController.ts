@@ -2,7 +2,7 @@ import { fromEvent, Subscription } from "rxjs";
 import { packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
 import { controlType, shipControlPacketData } from "../common/packets/client";
-import { initPacketData, kickPacketData, tickPacketData } from "../common/packets/server";
+import { effectPacketData, initPacketData, kickPacketData, serverChatPacketData, tickPacketData } from "../common/packets/server";
 import { player } from "../common/player";
 import { socket } from "../common/socket";
 import { ExtMath, vector } from "../common/vector";
@@ -17,6 +17,9 @@ import { translators } from "../common/props/translator";
 import { gameObjectManager } from "../common/gameObject";
 import { afterConstructor, appliable, constructorExtender, extendConstructor, propOwner } from "../common/props/decorators";
 import { appliableObject, objectChangeApplier } from "../common/props/changes";
+import { clientLaser } from "./clientLaser";
+import { laserAttribs } from "../common/laser";
+import { container } from "webpack";
 
 const TIMEOUT = 2000;
 const onKeydown = fromEvent<KeyboardEvent>(document, 'keydown');
@@ -33,6 +36,10 @@ export async function drawImage(canvas: CanvasRenderingContext2D, src: string, c
 @appliable()
 @propOwner()
 export class clientController extends player implements energyUnit, appliableObject {
+    public readonly production!: number;
+    public readonly chatBubble!: string;
+    public readonly consumption!: number;
+    public readonly laserAttribs!: laserAttribs;
     public readonly name: string;
     public readonly applier = new objectChangeApplier(this);
     @registerProp((_this: clientController) => ({
@@ -40,11 +47,13 @@ export class clientController extends player implements energyUnit, appliableObj
             .from(v => gameObjectManager.get(v) as clientPlayer)
             .to(v => v.id)
     }))
-    public readonly players = new register<player>((a, b) => a.id === b.id);
-    public readonly planets = new register<planet>((a, b) => a.id === b.id);
+    public readonly players = new register<clientPlayer | clientController>((a, b) => a.id === b.id);
+    public readonly planets = new register<clientPlanet>((a, b) => a.id === b.id);
+    public readonly lasers = new register<clientLaser>((a, b) => a.id === b.id);
 
     private gameElement = document.getElementById('game') as HTMLDivElement;
-    private playerElement = document.getElementById('self') as HTMLDivElement;
+    private chatElement = document.getElementById('chat') as HTMLDivElement;
+    private chatInputElement = document.getElementById('chatinput') as HTMLInputElement;
     private percentElement = document.getElementById('engpercent') as HTMLSpanElement;
     private energyBarElement = document.getElementById('energybar') as HTMLDivElement;
 
@@ -67,6 +76,7 @@ export class clientController extends player implements energyUnit, appliableObj
     private _canvas = this._canvasElement.getContext('2d') as CanvasRenderingContext2D;
 
     private lastTickTime: number = 0;
+    private lastTime: number = 0;
 
     private onTick(data: tickPacketData): void {
         this._delta = data.delta;
@@ -74,33 +84,41 @@ export class clientController extends player implements energyUnit, appliableObj
         if (data.deletedPlayers !== void 0) this.players.removeIf(player => data.deletedPlayers!.includes(player.id));
 
         if(data.newPlanets !== void 0) this.planets.add(...data.newPlanets.map(v => new clientPlanet(v)));
-        if(data.newPlayers !== void 0) this.players.add(...data.newPlayers.filter(v => v.id !== this.id).map(v => new clientPlayer(v)));
+        if(data.newPlayers !== void 0) {
+            this.players.add(...data.newPlayers.filter(v => v!.id !== this.id).map(v => new clientPlayer(v)));
+            data.newPlayers.filter(v => v!.id === this.id).forEach(v => {
+                this.applier.apply(v);
+            });
+        }
 
-        if (data.selectedPlanetId !== void 0) this.selectedPlanet = gameObjectManager.getTypedMaybe(data.selectedPlanetId, planet);
-
-        if (data.updatedPlayers !== void 0) {
-            for (let el of data.updatedPlayers) {
-                let changeDesc = el.changes;
-                let p = gameObjectManager.getTypedMaybe(el.id, player);
-                if (p instanceof clientPlayer || p instanceof clientController) {
-                    let applier = p.applier;
-                    p.prevLocation = p.location;
-                    p.prevDirection = p.direction;
-                    applier.apply(changeDesc);
+        try {
+            if (data.selectedPlanetId !== void 0) this.selectedPlanet = gameObjectManager.getTypedMaybe(data.selectedPlanetId, planet);
+    
+            if (data.updatedPlayers !== void 0) {
+                for (let id in data.updatedPlayers) {
+                    let changeDesc = data.updatedPlayers[id];
+                    let p = gameObjectManager.getTypedMaybe(id, player);
+                    if (p instanceof clientPlayer || p instanceof clientController) {
+                        let applier = p.applier;
+                        p.prevLocation = p.location;
+                        p.prevDirection = p.direction;
+                        applier.apply(changeDesc);
+                    }
+                }
+            }
+            if (data.updatedPlanets !== void 0) {
+                for (let id in data.updatedPlanets) {
+                    let changeDesc = data.updatedPlanets[id];
+                    let planet = (gameObjectManager.get(id) as clientPlanet | undefined);
+                    if (planet) {
+                        let applier = planet.applier;
+                        applier.apply(changeDesc);
+                        if (changeDesc?.owner !== void 0) planet.owner = gameObjectManager.getTypedMaybe(changeDesc.owner, player);
+                    }
                 }
             }
         }
-        if (data.updatedPlanets !== void 0) {
-            for (let el of data.updatedPlanets) {
-                let changeDesc = el.changes;
-                let planet = (gameObjectManager.get(el.id) as clientPlanet | undefined);
-                if (planet) {
-                    let applier = planet.applier;
-                    applier.apply(changeDesc);
-                    if (changeDesc.owner !== void 0) planet.owner = gameObjectManager.getTypedMaybe(changeDesc.owner, player);
-                }
-            }
-        }
+        catch {}
 
         this.updateInfoElement();
         this.updateBarElements();
@@ -109,8 +127,53 @@ export class clientController extends player implements energyUnit, appliableObj
     private onKick(data: kickPacketData): void {
         // TODO: Implement kick logic
     }
+    private onEffect(data: effectPacketData): void {
+        if (data.type === "laser") {
+            let laser = new clientLaser(data.id, vector.fromPoint(data.velocity), vector.fromPoint(data.location), data.size, data.decay, data.power);
+            this.lasers.add(laser);
 
+            let sub = laser.onDecay.subscribe(() => {
+                this.lasers.remove(laser);
+                laser.remove();
+                sub.unsubscribe();
+            });
+        }
+    }
+    private onChat(data: serverChatPacketData) {
+        const bElement = document.createElement('b');
+        const contentElement = document.createElement('span');
+        const containerElement = document.createElement('div');
 
+        if (data.name) {
+            bElement.innerText = data.name + ": ";
+            contentElement.innerText = data.message;
+            containerElement.append(bElement, contentElement);
+        }
+        else {
+            bElement.innerText = data.message;
+            containerElement.append(bElement);
+        }
+
+        this.chatElement.append(containerElement);
+    }
+
+    public static drawBubble(canvas: CanvasRenderingContext2D, stack: transformStack, clientRotation: number, bubble: string) {
+        stack.rotate(clientRotation);
+        stack.translate(new vector(0, -130));
+
+        canvas.fillStyle = '#fff';
+        canvas.strokeStyle = 'solid #000';
+        canvas.textAlign = 'center';
+        canvas.font = 'bold 20px Arial';
+
+        canvas.beginPath();
+        canvas.fillText(bubble, 0, 0);
+        canvas.fill();
+        
+        canvas.beginPath();
+        canvas.strokeText(bubble, 0, 0);
+        canvas.stroke();
+    }
     private async drawSelf(canvas: CanvasRenderingContext2D, stack: transformStack) {
         stack.begin();
         stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
@@ -118,23 +181,26 @@ export class clientController extends player implements energyUnit, appliableObj
         // stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
         await drawImage(canvas, 'player.png');
 
+        clientController.drawBubble(canvas, stack, 0, this.chatBubble);
+
         stack.end();
     }
 
     /**
      * Updates transformation of player and game
      */
-    private async redraw(tickDelta: number) {
+    private async redraw(tickDelta: number, delta: number) {
         let canvasEl = document.createElement('canvas');
         canvasEl.width = this._canvasElement.width;
         canvasEl.height = this._canvasElement.height;
         let canvas = canvasEl.getContext('2d') as CanvasRenderingContext2D;
 
+        canvas.beginPath();
+        canvas.rect(0, 0, this._canvasElement.width, this._canvasElement.height);
         canvas.fillStyle = '#000';
-        canvas.fillRect(0, 0, this._canvasElement.width, this._canvasElement.height);
+        canvas.fill();
 
         let stack = new transformStack(canvas);
-        // stack.transformOrigin = new vector(this._canvasElement.width / 2, this._canvasElement.height / 2);
         stack.begin();
         
         let lerpedDir = ExtMath.lerp(this.prevDirection, this.direction, tickDelta);
@@ -144,12 +210,16 @@ export class clientController extends player implements energyUnit, appliableObj
         stack.rotate(-lerpedDir);
         stack.translate(lerpedLoc.invert());
 
+        for (let planet of this.planets.array) {
+            await (planet as clientPlanet).draw(this.selectedPlanet?.id === planet.id, canvas, stack);
+        }
+        for (let laser of this.lasers.array) {
+            laser.update(delta);
+            laser.draw(canvas, stack);
+        }
         for (let player of this.players.array) {
             if (player instanceof clientPlayer)
                 await (player as clientPlayer).draw(canvas, stack, lerpedDir, tickDelta);
-        }
-        for (let planet of this.planets.array) {
-            await (planet as clientPlanet).draw(this.selectedPlanet?.id === planet.id, canvas, stack);
         }
 
         stack.end();
@@ -231,11 +301,18 @@ export class clientController extends player implements energyUnit, appliableObj
             case "ArrowRight":
                 this.connection.sendPacket(packetCode.CONTROL, { starting: pressing, type: controlType.Right });
                 break;
+            case "Space":
+                this.connection.sendPacket(packetCode.CONTROL, { starting: pressing, type: controlType.Fire });
+                break;
+            case "Enter":
+                if (pressing)
+                this.chatInputElement.focus();
         }
     }
 
     private async frame(time: number) {
-        await this.redraw((time - this.lastTickTime) / (this._delta * 1000));
+        await this.redraw((time - this.lastTickTime) / (this._delta * 1000), (time - this.lastTime) / 1000);
+        this.lastTime = time;
         requestAnimationFrame(this.frame.bind(this));
     }
 
@@ -252,15 +329,23 @@ export class clientController extends player implements energyUnit, appliableObj
         this.connection = connection;
         this.name = name;
 
-        this._subscribers.push(
-            onKeydown.subscribe(kb => {
-                if (!kb.repeat) this.onKey(kb.code, true);
-            }),
-            onKeyup.subscribe(kb => this.onKey(kb.code, false)),
-        );
-
         this.connection.onPacket<tickPacketData>(packetCode.TICK).subscribe(v => this.onTick(v.data));
         this.connection.onPacket<kickPacketData>(packetCode.KICK).subscribe(v => this.onKick(v.data));
+        this.connection.onPacket<effectPacketData>(packetCode.EFFECT).subscribe(v => this.onEffect(v.data));
+        this.connection.onPacket<serverChatPacketData>(packetCode.CHAT).subscribe(v => this.onChat(v.data));
+        this.connection.onPacket<effectPacketData>(packetCode.ENDEFFECT).subscribe(v => {
+            let laser = gameObjectManager.getTypedMaybe(v.data.id, clientLaser);
+
+            if (laser) {
+                this.lasers.remove(laser);
+                laser.remove();
+            }
+        });
+
+        this.gameElement.onkeydown = kb => {
+            if (!kb.repeat) this.onKey(kb.code, true);
+        };
+        this.gameElement.onkeyup = kb => this.onKey(kb.code, false);
         
         this.lastTickTime = performance.now();
 
@@ -280,12 +365,19 @@ export class clientController extends player implements energyUnit, appliableObj
             } as shipControlPacketData);
         };
 
-        requestAnimationFrame(this.frame.bind(this));
-    }
+        this.gameElement.focus();
+        this.chatInputElement.onkeydown = e => {
+            if (e.code === "Enter" && this.chatInputElement.value !== '') {
+                connection.sendPacket(packetCode.CHAT, {
+                    message: this.chatInputElement.value,
+                });
+                this.chatInputElement.value = "";
+                this.gameElement.focus();
+            }
+        }
 
-    @afterConstructor()
-    private afterConstr(packet: initPacketData) {
-        this.applier.apply(packet);
+
+        requestAnimationFrame(this.frame.bind(this));
     }
 
     /**
@@ -306,6 +398,7 @@ export class clientController extends player implements energyUnit, appliableObj
             throw new Error(res.message + ": " + res.description);
         }
         else {
+
             return new clientController(res.data, con, name);
         }
     }

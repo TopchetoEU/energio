@@ -1,6 +1,7 @@
 import { point } from "../packets";
 import { objectChangeDescriptor } from "../props/changes";
 import { NIL } from "uuid";
+import { laserCreationData } from "../laser";
 
 /**
  * An enum of all possible kick reasons
@@ -55,16 +56,14 @@ export enum kickReason {
  * Sent by the server
  */
 export interface playerUpdateData {
-    id: string;
-    changes: objectChangeDescriptor;
+    [id: string]: objectChangeDescriptor;
 }
 /**
  * Data, used to update a planet on the client-side.
  * Sent by the server
  */
 export interface planetUpdateData {
-    id: string;
-    changes: objectChangeDescriptor;
+    [id: string]: objectChangeDescriptor;
 }
 
 /**
@@ -77,12 +76,12 @@ export interface tickPacketData {
      * An array, containing all changes, that were made to all
      * visible players since the last tick
      */
-    updatedPlayers?: playerUpdateData[];
+    updatedPlayers?: playerUpdateData;
     /**
      * An array, containing all changes, that were made to all
      * visible planets since the last tick
      */
-    updatedPlanets?: planetUpdateData[];
+    updatedPlanets?: planetUpdateData;
     /**
      * An array, containing initialization data for all
      * players, that were created since the last tick, or
@@ -153,7 +152,7 @@ export interface initPacketData {
  * whenever a laser effect is being played. Only this effect
  * may get ended and the client must draw these
  */
-export interface laserPacketData {
+export interface laserPacketData extends laserCreationData {
     /**
      * The type of the effect. In this case, a laser
      */
@@ -162,31 +161,6 @@ export interface laserPacketData {
      * The id of the laser
      */
     id: string;
-    /**
-     * The location at which the laser was shot
-     */
-    location: point;
-    /**
-     * The velocity of the laser
-     */
-    velocity: point;
-    /**
-     * The size (width, in pixels) of the laser
-     */
-    size: number;
-    /**
-     * The color of the laser
-     */
-    color: { r: number, g: number, b: number }
-    /**
-     * The decay (per second, gigawatts) of the laser.
-     * If the power of the laser reaches 0, the laser will automatically be destroyed
-     */
-    decay: number;
-    /**
-     * The power (gigawatts) of the laser
-     */
-    power: number;
 }
 /**
  * A subset of the effectPacketData, sent by the server,
@@ -232,6 +206,13 @@ export type effectPacketData = particlePacketData | laserPacketData;
  * A packet sent by the client when an effect should
  * be stopped and freed
  */
-export interface stopEffectPacketData {
+export interface endEffectPacketData {
     id: string;
+}
+/**
+ * A packet, sent by the server whenever someone sent a message
+ */
+export interface serverChatPacketData {
+    message: string;
+    name?: string;
 }

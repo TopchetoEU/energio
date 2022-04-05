@@ -15,8 +15,7 @@ export const ExtMath = {
         return src * (1 - gradient) + dest * gradient;
     },
     squareSum(a: number, b: number) {
-         // I knew I'd need this
-        return a * a + 2 * a * b + b * b;
+        return (a + b) * (a + b);
     }
 }
 
@@ -137,6 +136,13 @@ export class vector {
         this.y = y;
     }
 
+    public  toDirection(inRadians: boolean = false): number {
+        let angle = Math.atan(this.normalized.y / this.normalized.x) + Math.PI / 2;
+
+        if (!inRadians) angle = angle * 180 / Math.PI;
+
+        return angle;
+    }
     public static fromDirection(direction: number, inRadians: boolean = false): vector {
         if (!inRadians) direction = direction * Math.PI / 180;
 

@@ -13,7 +13,7 @@ export class hitbox {
     }
 
     public static distance(first: hitboxOwner, second: hitboxOwner) {
-        return first.location.distance(second.location) - first.hitbox.radius - second.hitbox.radius;
+        return first.location.distance(second.location) - first.hitbox.diameter - second.hitbox.diameter;
     }
 
     public get radius() {

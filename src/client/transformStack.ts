@@ -1,5 +1,5 @@
 import { transform } from "typescript";
-import { vector } from "../common/vector";
+import { ExtMath, vector } from "../common/vector";
 
 interface transformation {
     undo(context: DOMMatrix): void;
@@ -95,6 +95,7 @@ export class transformStack {
      * @param offset Offset to translate with
      */
     public rotate(angle: number, inRadians: boolean = false) {
+        if (ExtMath.numEquals(angle, 0)) return false;
         if (inRadians) angle = angle / Math.PI * 180;
         if (!this.transformOrigin.equals(vector.zero)) this.translate(this.transformOrigin.invert());
         this.pushTransformation(new rotation(angle));

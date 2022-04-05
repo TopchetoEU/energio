@@ -1,17 +1,18 @@
 import { NIL } from "uuid";
 import { energyConsumer, energyUnit } from "./energy";
 import { gameObject, gameObjectManager } from "./gameObject";
+import { laserAttribs } from "./laser";
 import { planet, planetsOwner } from "./planet";
-import { paramProp } from "./props/decorators";
+import { afterConstructor, paramProp } from "./props/decorators";
 import { valProp } from "./props/property";
 import { register, registerProp } from "./props/register";
 import { translators } from "./props/translator";
-import { planetTranslator } from "./translators";
 import { vector } from "./vector";
 
+const translator = translators<gameObject, string>().from(v => gameObjectManager.get(v)).to(v => v.id);
 
 export abstract class player extends gameObject implements energyUnit {
-
+    @valProp({ isTracked: true }) public abstract readonly laserAttribs: laserAttribs;
     @registerProp({
         isTracked: true,
         translator: translators<planet | undefined, string>()
@@ -26,17 +27,12 @@ export abstract class player extends gameObject implements energyUnit {
 
     @valProp({ isTracked: true }) public abstract readonly name: string;
 
-    public get production() {
-        return this.ownedPlanets.array.map(v => v.production).reduce((prev, curr) => prev + curr, 0);
-    }
-    public get consumption() {
-        return this.workingConsumers.array.map(v => v.consumption).reduce((prev, curr) => prev + curr, 0);
-    }
+    @valProp({ isTracked: true }) public abstract readonly production: number;
+    @valProp({ isTracked: true }) public abstract readonly consumption: number;
+
+    @valProp({ isTracked: true }) public abstract readonly chatBubble: string;
 
     @valProp() public selectedPlanet?: planet = undefined;
-
-    @registerProp({ isTracked: true }) public readonly consumers = new register<energyConsumer>((a, b) => a.id === b.id);
-    @registerProp({ isTracked: true }) public readonly workingConsumers = new register<energyConsumer>((a, b) => a.id === b.id);
 
     public constructor(
         @paramProp(valProp({ isTracked: true })) public readonly id: string,
@@ -47,9 +43,18 @@ export abstract class player extends gameObject implements energyUnit {
         this.location = initialLocation ?? vector.zero;
         this.direction = direction ?? 0;
     
-        this.ownedPlanets.onAdd.subscribe(v => v.owner = this);
-        this.ownedPlanets.onRemove.subscribe(v => v.owner = undefined);
+        this.ownedPlanets.onAdd.subscribe(v => {
+            v.owner = this;
+        });
+        this.ownedPlanets.onRemove.subscribe(v => {
+            v.owner = undefined;
+        });
     }
+
+    // @afterConstructor()
+    // private afterConstr() {
+        
+    // }
 }
 
 export interface playersOwner {

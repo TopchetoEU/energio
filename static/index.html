@@ -10,11 +10,11 @@
     <link rel="stylesheet" href="css/style.css">
 <body>
     <!-- <div class="game"> -->
-    <canvas id="game" class="game">
+    <canvas id="game" class="game" tabindex="0">
         Your browser isn't supported :(
     </canvas>
     <!-- </div> -->
-    <div id="gui">
+    <div id="gui" tabindex="-1">
         <div class="energyContainer">
             <div class="energyInfo">
                 <span>Energy</span>
@@ -28,7 +28,7 @@
             <h2>Planet info:</h2>
             <div class="infoGrid" id="planetprops">
             </div>
-            <input placeholder="Count (in millions)" type="number" id="peoplecount">
+            <input placeholder="Count (in millions)" type="number" id="peoplecount" tabindex="2">
             <div id="planetPeople" class="field">
                 <button id="takepeoplebtn">Take</button>
                 <button id="leavepeoplebtn">Leave</button>
@@ -38,6 +38,13 @@
             <h2>Player info:</h2>
             <div class="infoGrid" id="playerprops">
             </div>
+        </div>
+        <div class="chat">
+            <div class="msgs-container">
+                <div class="messages" id="chat">
+                </div>
+            </div>
+            <input type="text" tabindex="1" id="chatinput"> 
         </div>
     </div>
     <div id="modal" class="overlay">

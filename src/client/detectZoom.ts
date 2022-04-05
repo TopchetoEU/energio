@@ -289,7 +289,6 @@ export default {
      * @return {Number} Zoom level
     */
     get zoom() {
-        console.log(detectFunction);
         return detectFunction().zoom;
     },
     /**

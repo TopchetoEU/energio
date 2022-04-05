@@ -65,7 +65,7 @@ export class register<T> {
         return this.array.filter(predicate)[0];
     }
     public reduce(reducer: (prev: T, curr: T) => T) : T;
-    public reduce<T2>(reducer: (prev: T, curr: T) => T, initialValue: T2): T2;
+    public reduce<T2>(reducer: (prev: T2, curr: T) => T2, initialValue: T2): T2;
     public reduce(reducer: (prev: any, curr: T) => any, initialValue?: any) {
         return this.array.reduce(reducer, initialValue);
     }
@@ -156,16 +156,21 @@ export class registerChangeTracker<T, srcT = T> implements changeTracker<registe
     }
 
     get initDescriptor(): registerChangeDescriptor<srcT> {
-        return {
+        let res = {
             added: this.register.array.map(v => this.translator.to(v)),
-            removed: [],
         };
+
+        if (res.added.length === 0) return undefined;
+        return res;
     }
     get changeDescriptor(): registerChangeDescriptor<srcT> {
-        return {
-            added: this._added.array,
-            removed: this._removed.array,
+        let res = {
+            added: this._added.length === 0 ? undefined : this._added.array,
+            removed: this._removed.length === 0 ? undefined : this._removed.array,
         };
+
+        if (!res.added && !res.removed) return undefined;
+        return res;
     }
     reset(): void {
         this._added.clear();

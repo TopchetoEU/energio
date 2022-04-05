@@ -1,6 +1,6 @@
-import { filter, Observable, Subject } from "rxjs";
+import { Observable, Subject } from "rxjs";
 import { register } from "../../common/props/register";
-import { EPSILON, ExtMath, vector } from "../../common/vector";
+import { EPSILON, vector } from "../../common/vector";
 import { hitbox } from "./hitbox";
 import { hitboxOwner } from "./hitboxOwner";
 import { physicsController } from "./physicsController";
@@ -26,8 +26,14 @@ export class physicsEngine {
 
     /**
      * Serj Tankian's favourite
+     * Taken from https://stackoverflow.com/a/9455734
      */
     private bounce(a: bouncable, b: bouncable): bounceResult {
+        if (a.mass < EPSILON || b.mass < EPSILON) return {
+            velocityA: a.velocity,
+            velocityB: b.velocity,
+        }
+
         var dt, mT, v1, v2, cr, sm,
             dn = a.location.subtract(b.location),
             sr = a.hitbox.radius + b.hitbox.radius, // sum of radii
@@ -42,8 +48,8 @@ export class physicsEngine {
         // this is susceptible to rounding errors, "jiggle" behavior and anti-gravity
         // suspension of the object get into a strange state
         mT = dn.multiply(a.hitbox.radius + b.hitbox.radius - dx);
-        a.location = a.location.add(mT.multiply(b.mass / sm * 100));
-        b.location = b.location.add(mT.multiply(-a.mass / sm * 100));
+        a.location = a.location.add(mT.multiply(b.mass / sm));
+        b.location = b.location.add(mT.multiply(-a.mass / sm));
 
         // cache the magnitude of the applicable component of the relevant velocity
         v1 = dn.multiply(a.velocity.dot(dn)).length;
@@ -60,7 +66,7 @@ export class physicsEngine {
 
         return { velocityA: velA, velocityB: velB };
     }
-    private move(direction: vector, stepLength: number, length: number, controller: physicsController): boolean {
+    private move(direction: vector, stepLength: number, length: number, controller: physicsController) {
         let testHitbox: hitboxOwner = {
             location: controller.location,
             hitbox: controller.hitbox,
@@ -78,7 +84,6 @@ export class physicsEngine {
 
             if (colliders.length > 0) {
                 controller.location = testHitbox.location;
-                // controller.velocity = controller.velocity.invert().multiply(1 / controller.mass);
 
                 for (let collider of colliders) {
                     if ((collider as physicsController).velocity !== void 0) {
@@ -88,8 +93,6 @@ export class physicsEngine {
 
                         controller.velocity = res.velocityA;
                         otherController.velocity = res.velocityB;
-
-                        // otherController.velocity = controller.velocity.invert().normalized.multiply(otherController.velocity.length / controller.mass + 10 / controller.mass);
 
                         if (otherController.onCollision) otherController.onCollision(controller);
                     }
@@ -105,14 +108,13 @@ export class physicsEngine {
                     if (controller.onCollision) controller.onCollision(collider);
                 }
 
-                return true;
+                return;
             }
 
             length -= stepLen;
         }
 
         controller.location = testHitbox.location;
-        return false;
     }
 
     private colliders(collider: hitboxOwner, actualCollider: hitboxOwner | physicsController = collider) {
@@ -120,8 +122,9 @@ export class physicsEngine {
     }
 
     private updateController(delta: number, controller: physicsController) {
+        // if (controller instanceof serverLaser) console.log(controller.le);
         if (controller.velocity.lengthSquared < EPSILON) controller.velocity = vector.zero;
-        else this.move(controller.velocity, this.step, controller.velocity.length, controller);
+        else this.move(controller.velocity, this.step, controller.velocity.length * delta, controller);
 
         controller.velocity = controller.velocity.drag(controller.linearDrag - 1, delta);
     }

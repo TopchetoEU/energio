@@ -22,7 +22,7 @@ export abstract class planet extends gameObject implements energyUnit {
     }) public owner?: player;
     @valProp({ isTracked: true }) public population: number = 0;
     @valProp({ isTracked: true }) public abstract readonly production: number;
-    @valProp() public abstract readonly consumption: number;
+    @valProp({ isTracked: true }) public abstract readonly consumption: number;
 
     @valProp({ isTracked: true }) public abstract readonly productionPerCapita: number;
     @valProp({ isTracked: true }) public abstract readonly limit: number;
@@ -36,11 +36,7 @@ export abstract class planet extends gameObject implements energyUnit {
     public readonly populationChanged!: Observable<number>;
     public readonly productionChanged!: Observable<number>;
 
-    @valProp() public readonly optionalConsumer: boolean = true;
-
-    public getConsumption() {
-        return this.consumption;
-    }
+    @valProp() public readonly optionalConsumer: boolean = false;
 
     public constructor(
         id: string,

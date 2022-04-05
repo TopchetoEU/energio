@@ -26,9 +26,9 @@ export function clone(obj: any) {
 }
 
 export type propertyChangeDescriptor<T> = T | undefined;
-export interface objectChangeDescriptor {
+export type objectChangeDescriptor = {
     [name: string]: propertyChangeDescriptor<any>;
-}
+} | undefined;
 
 export type changeTrackerFactory<T, descT, valT, srcT = valT> = (obj: T, translator: translator<valT, srcT>) => changeTracker<descT>;
 export interface changeTracker<descT> {
@@ -52,6 +52,12 @@ export class propertyChangeApplier<srcT, T> implements changeApplier<propertyCha
 
     public constructor(private obj: any, private name: string, private translator: translator<T, srcT>) { }
 }
+export function isEmpty(object: any) {
+    for (const property in object) {
+        if (object[property] !== void 0) return false;
+    }
+    return true;
+}
 export class objectChangeApplier implements changeApplier<objectChangeDescriptor> {
     private props: Map<string, changeApplier<propertyChangeDescriptor<any>>> = new Map();
 
@@ -62,6 +68,7 @@ export class objectChangeApplier implements changeApplier<objectChangeDescriptor
         return obj => new objectChangeApplier(obj);
     }
     public apply(desc: objectChangeDescriptor) {
+        if (desc === void 0) return;
         for (let [ prop, applier ] of this.props) {
             applier.apply(desc[prop]);
         }
@@ -131,6 +138,8 @@ export class objectChangeTracker implements changeTracker<objectChangeDescriptor
         for (let name in this.trackers) {
             obj[name] = this.trackers[name].initDescriptor;
         }
+
+        if (isEmpty(obj)) return undefined;
         return obj;
     }
     public get changeDescriptor(): objectChangeDescriptor {
@@ -138,6 +147,8 @@ export class objectChangeTracker implements changeTracker<objectChangeDescriptor
         for (let name in this.trackers) {
             obj[name] = this.trackers[name].changeDescriptor;
         }
+
+        if (isEmpty(obj)) return undefined;
         return obj;
     }
 

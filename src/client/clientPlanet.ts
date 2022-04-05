@@ -52,7 +52,7 @@ export class clientPlanet extends planet implements appliableObject {
     }
 
     constructor(packet: objectChangeDescriptor) {
-        super(packet.id, vector.fromPoint(packet.location as point));
+        super(packet!.id, vector.fromPoint(packet!.location as point));
     }
 
     @afterConstructor()

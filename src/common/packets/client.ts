@@ -29,7 +29,6 @@ export enum controlType {
     Right,
     /**
      * The player has fired his weapon (pressed Space).
-     * Not yet supported
      */
     Fire,
 }
@@ -62,4 +61,10 @@ export interface shipControlPacketData {
      * any value works here
      */
     count: number;
+}
+/**
+ * A packet, sent whenever the client sent a chat message
+ */
+export interface clientChatPacketData {
+    message: string;
 }

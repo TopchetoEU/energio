@@ -2,16 +2,20 @@ import { player } from "../common/player";
 import { vector, EPSILON, ExtMath } from "../common/vector";
 import { packet, packetConnection } from "../common/packetConnection";
 import { serverPlanet } from "./serverPlanet";
-import { energyUnit } from "../common/energy";
+import { energyConsumer, energyUnit } from "../common/energy";
 import { planet } from "../common/planet";
 import { Observable, Subscription } from "rxjs";
 import { objectChangeTracker, trackableObject } from "../common/props/changes";
 import { getNextObjId } from "./server";
 import { register } from "../common/props/register";
-import { propOwner, trackable } from "../common/props/decorators";
-import { gameObjectManager } from "../common/gameObject";
+import { afterConstructor, constructorExtender, propOwner, trackable } from "../common/props/decorators";
+import { gameObject, gameObjectManager } from "../common/gameObject";
 import { physicsController } from "./physics/physicsController";
 import { hitbox } from "./physics/hitbox";
+import { hitboxOwner } from "./physics/hitboxOwner";
+import { laser, laserAttribs } from "../common/laser";
+import { laserFirer } from "./laserFirer";
+import { serverLaser } from "./serverLaser";
 
 export const SPEED = 100;
 export const DRAG = -.8;
@@ -26,22 +30,55 @@ export enum rotationDirection {
 
 export type packetHandle<T> = (player: serverPlayer, packet: packet<T>) => void;
 
+class basicConsumer extends gameObject implements energyConsumer {
+    public readonly optionalConsumer = true;
+    public active: boolean = false;
+
+    public get consumption() {
+        return this.active ? this._consumption : 0;
+    }
+
+    public constructor(private readonly _consumption: number) {
+        super(getNextObjId());
+    }
+}
+
+@constructorExtender()
 @trackable()
 @propOwner()
-export class serverPlayer extends player implements energyUnit, trackableObject, physicsController {
+export class serverPlayer extends player implements energyUnit, trackableObject, physicsController, laserFirer {
+    public production: number = 0;
+    public consumption: number = 0;
+    public chatBubble: string = '';
+    public chatBubbleChanged!: Observable<string>;
+
+    public readonly consumers = new register<energyConsumer>((a, b) => a.id === b.id);
+    public readonly workingConsumers = new register<energyConsumer>((a, b) => a.id === b.id);
+
+    public readonly laserAttribs: laserAttribs = {
+        decay: .005,
+        power: .01,
+        size: 5,
+        velocity: 1000,
+        frequency: 10,
+    };
     public name!: string;
     public readonly tracker = new objectChangeTracker(this);
     public readonly connection: packetConnection;
     public readonly mass = 2;
-    public moving = false;
+    public get moving() {
+        return this.workingConsumers.includes(this.movingConsumer);
+    }
+
+    public laserI = 0;
+
+    public readonly movingConsumer = new basicConsumer(.5);
+    public readonly shootingConsumer;
 
     // TODO: unhardcodify
     public readonly linearDrag = .2;
     public readonly angularDrag = .1;
     public readonly hitbox = new hitbox(75);
-
-    private readonly ownedPlanetsChanged!: Observable<register<planet>>;
-    private readonly movingChanged!: Observable<boolean>;
 
     public rotationDirection: rotationDirection = rotationDirection.NONE;
 
@@ -50,23 +87,30 @@ export class serverPlayer extends player implements energyUnit, trackableObject,
     public velocity: vector = vector.zero;
     public angularVelocity: number = 0;
 
+    // public onCollision(other: hitboxOwner) {
+    //     console.log(`I hit ${other}`);
+    // }
 
-    private updatePos(delta: number) {
-        // this._angularVelocity += this.rotationDirection * ANGULAR_SPEED;
 
-        // if (this.moving) {
-        //     this._velocity = this._velocity.add(vector.fromDirection(this.direction).multiply(SPEED * delta));
-        // }
+    private updateStats() {
+        this.production = this.ownedPlanets.reduce((prev, curr) => prev + curr.production, 0);
+        let mandatory = this.consumers.filter(v => !v.optionalConsumer);
+        let optional = this.consumers.filter(v => v.optionalConsumer);
 
-        // if (Math.abs(this._angularVelocity) < EPSILON) this._angularVelocity = 0;
-        // else this.direction += this.angularVelocity * delta;
+        let mandatorySum = mandatory.reduce((prev, curr) => prev + curr.consumption, 0);
+        let optionalsSum = 0;
+        let selectedOptionals: energyConsumer[] = [];
 
-        // if (this._velocity.lengthSquared < EPSILON) this._velocity = vector.zero;
-        // else this.location = this.location.add(this.velocity);
+        for (let consumer of optional) {
+            if (consumer.consumption < EPSILON) continue;
+            if (consumer.consumption + optionalsSum + mandatorySum < this.production) {
+                selectedOptionals.push(consumer);
+                optionalsSum += consumer.consumption;
+            }
+        }
 
-        // this._angularVelocity *= ExtMath.drag(ANGULAR_DRAG, delta);
-        // this._velocity = this._velocity.drag(DRAG, delta);
-        // this.updateSelection();
+        this.workingConsumers.array = [ ...mandatory, ...selectedOptionals ];
+        this.consumption = mandatorySum + optionalsSum;
     }
     private updateSelection() {
         let leastDist = -1;
@@ -75,7 +119,7 @@ export class serverPlayer extends player implements energyUnit, trackableObject,
 
         // Finds closest planet
         for (let planet of gameObjectManager.getAll(serverPlanet)) {
-            let dist = hitbox.distance(planet, this);
+            let dist = planet.location.distance(this.location) - planet.hitbox.radius;
             if (leastDist < 0 || dist < leastDist) {
                 leastDist = dist;
                 closestPlanet = planet as serverPlanet;
@@ -90,34 +134,70 @@ export class serverPlayer extends player implements energyUnit, trackableObject,
 
         this.selectedPlanet = closestPlanet;
     }
-    public update(delta: number) {
+
+    public update(delta: number, shoot: () => void) {
+        this.angularVelocity += ANGULAR_SPEED * this.rotationDirection;
+        this.angularVelocity *= ExtMath.drag(this.angularDrag - 1, delta);
         if (Math.abs(this.angularVelocity) < EPSILON) this.angularVelocity = 0;
         else this.direction += this.angularVelocity * delta;
-        this.angularVelocity *= ExtMath.drag(this.angularDrag - 1, delta);
 
         if (this.moving) {
-            this.velocity = this.velocity.add(vector.fromDirection(this.direction).multiply(SPEED * delta));
+            this.velocity = this.velocity.add(vector.fromDirection(this.direction).multiply(SPEED));
         }
-        this.angularVelocity += ANGULAR_SPEED * this.rotationDirection;
+
         this.updateSelection();
+        this.updateStats();
+
+        if (this.workingConsumers.includes(this.shootingConsumer)) {
+            if (ExtMath.numEquals(this.laserI % ((1 / this.laserAttribs.frequency) / delta), 0)) {
+                shoot();
+            }
+            this.laserI++;
+        }
+
+        this.chatTimeout -= delta;
+        if (this.chatTimeout < 0) this.chatBubble = '';
     }
+    public createLaser(): serverLaser {
+        return new serverLaser(getNextObjId(), {
+            decay: this.laserAttribs.decay,
+            velocity: vector.fromDirection(this.direction).multiply(this.laserAttribs.velocity),
+            location: this.location.add(vector.fromDirection(this.direction).multiply(this.hitbox.diameter + 20)),
+            power: this.laserAttribs.power,
+            size: this.laserAttribs.size,
+        });
+    }
+
+    chatTimeout = 0;
 
     public constructor(name: string, connection: packetConnection, location?: vector, direction?: number) {
         super(getNextObjId(), location, direction);
-
+        
         this.connection = connection;
         this.name = name;
 
-        // this.ownedPlanets.onAdd.subscribe(v => {
-        //     this._subscribers[v.id] = merge(v.productionChanged).subscribe(() => this.updateStats(this.ownedPlanets));
-        // });
-        // this.ownedPlanets.onRemove.subscribe(v => {
-        //     delete this._subscribers[v.id];
-        // });
+        this.shootingConsumer = new basicConsumer(this.laserAttribs.power * this.laserAttribs.frequency);
+
+        this.ownedPlanets.onAdd.subscribe(v => {
+            this.consumers.add(v);
+        });
+        this.ownedPlanets.onRemove.subscribe(v => {
+            this.consumers.remove(v);
+        });
+
+        this.consumers.add(this.movingConsumer);
+        this.consumers.add(this.shootingConsumer);
 
         // this.movingChanged.subscribe(v => {
             // this.actuallyWalking = this.consumption + 1 < this.production;
             // this.updateStats(planetsOwner.planets);
         // });
+    }
+
+    @afterConstructor()
+    private _afterConstr() {
+        this.chatBubbleChanged.subscribe(v => {
+            this.chatTimeout = 2;
+        });
     }
 }
