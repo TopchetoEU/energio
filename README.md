@@ -2,6 +2,12 @@
 
 ![Energ.io image](./static/images/big-logo.png)
 
+## What is this?
+
+This is a multiplayer strategy .io game, in which each player is an empire, which is fighting with the other empires (aka players) for control over the galaxy, in order to explit it for its energy.
+
+In this game, there are two recources: energy and people. The people are used to colonise other planets, and they produce energy, the second recource. Energy is not a collectable resource thou, rather, the energy is measured in watts, aka how much are you producing. This means that ahything you do will consume some of this energy, so you've got to be really careful about how you spend your energy in the game. If you lose all of your energy producers, you lose the game as well.
+
 ## How to use?
 
 First, you'll need the following installed:
