@@ -1,6 +1,6 @@
 import { map, merge, Observable, Subject, Subscription } from "rxjs";
 import { changeApplier, changeApplierFactory, changeTracker, changeTrackerFactory } from "./changes";
-import { prop, propOptions, propOptionsSource } from "./decorators";
+import { prop, propOptions } from "./decorators";
 import { defaultEquator, equator, property } from "./property";
 import { defaultTranslator, translator, translators } from "./translator";
 
@@ -94,29 +94,41 @@ export class register<T> {
         });
     }
 
-    public constructor(public readonly equator: equator<T> = defaultEquator, otherReg?: register<T>) {
+    public constructor(public equator: equator<T> = defaultEquator, otherReg?: register<T>) {
         this.equator = equator;
         otherReg?.forEach(v => this.add(v));
     }
 }
 
-export class registerProperty<T> implements property<register<T>> {
-    get value(): register<T> {
+export class registerProperty<T> implements property<register<T> | undefined> {
+    get value(): register<T> | undefined {
         return this.register;
     }
-    set value(val: register<T>) {
-        this.value.array = val.array;
+    set value(val: register<T> | undefined) {
+        if (val === this.value) return;
+        this.register = val;
+        this._onChange.next(val);
     }
 
-    get onChange(): Observable<register<T>> {
-        return merge(this.register.onAdd, this.register.onRemove).pipe(
+    private _onChange = new Subject<register<T> | undefined>();
+
+    get onChange(): Observable<register<T> | undefined> {
+        if (this.register) return merge(
+            this.register.onAdd.pipe(map(v => this.value)),
+            this.register.onRemove.pipe(map(v => this.value)),
+            this._onChange
+        ).pipe(
             map(v => this.value)
         );
+        else return new Observable();
     }
 
-    public readonly equator: equator<register<T>> = (a, b) => a.includesAll(...b.array);
+    public readonly equator: equator<register<T> | undefined> = (a, b) => {
+        if (a === void 0 || b === void 0) return a === void 0 && b === void 0;
+        return a.includesAll(...b.array) ?? true;
+    }
 
-    public constructor(private register: register<T>, public readonly elementEquator: equator<T>) {
+    public constructor(private register: register<T> | undefined, public readonly elementEquator: equator<T>) {
     }
 }
 
@@ -128,15 +140,21 @@ export class registerChangeTracker<T, srcT = T> implements changeTracker<registe
     private _added: register<srcT>;
     private _removed: register<srcT>;
     private _disposed = false;
-    private _addHandle: Subscription;
-    private _removeHandle: Subscription;
+    private _addHandle?: Subscription;
+    private _removeHandle?: Subscription;
+    private _equator?: equator<srcT>;
+    private _oldRegister?: register<T>;
 
     private get register() {
         return this._register.value;
     }
 
-    public static factory<T, srcT = T>(): changeTrackerFactory<property<register<T>>, registerChangeDescriptor<srcT>, T, srcT> {
-        return (obj, translator) => new registerChangeTracker<T, srcT>(obj, translator);
+    public static factory<T, srcT = T>(): changeTrackerFactory<property<register<T> | undefined>, registerChangeDescriptor<srcT>, T, srcT> {
+        return (obj, translator) => {
+            if (!(obj instanceof registerProperty))
+                throw new Error("Register tracker may be used only on a register property.");
+            return new registerChangeTracker<T, srcT>(obj, translator);
+        }
     }
 
     public get added() {
@@ -148,8 +166,8 @@ export class registerChangeTracker<T, srcT = T> implements changeTracker<registe
 
     public dispose(): void {
         if (this.disposed) return;
-        this._addHandle.unsubscribe();
-        this._removeHandle.unsubscribe();
+        this._addHandle?.unsubscribe();
+        this._removeHandle?.unsubscribe();
     }
     public get disposed(): boolean {
         return this._disposed;
@@ -157,10 +175,10 @@ export class registerChangeTracker<T, srcT = T> implements changeTracker<registe
 
     get initDescriptor(): registerChangeDescriptor<srcT> {
         let res = {
-            added: this.register.array.map(v => this.translator.to(v)),
+            added: this.register?.array.map(v => this.translator.to(v)),
         };
 
-        if (res.added.length === 0) return undefined;
+        if (!res.added || res.added.length === 0) return undefined;
         return res;
     }
     get changeDescriptor(): registerChangeDescriptor<srcT> {
@@ -177,25 +195,48 @@ export class registerChangeTracker<T, srcT = T> implements changeTracker<registe
         this._removed.clear();
     }
 
-    constructor(private _register: property<register<T>>, private translator: translator<T, srcT> = defaultTranslator) {
-        const equator = (a: srcT, b: srcT) => this.register.equator(translator.from(a), translator.from(b));
-        this._added = new register<srcT>(equator);
-        this._removed = new register<srcT>(equator);
+    private add(el: T) {
+        const translated = this.translator.to(el);
+        if (this._removed.includes(translated))
+            this._removed.remove(translated);
+        else
+            this._added.add(translated);
+    }
+    private remove(el: T) {
+        const translated = this.translator.to(el);
+        if (this._added.includes(translated))
+            this._added.remove(translated);
+        else
+            this._removed.add(translated);
+    }
 
-        this._addHandle = this.register.onAdd.subscribe(v => {
-            const translated = translator.to(v);
-            if (this._removed.includes(translated))
-                this._removed.remove(translated);
-            else
-                this._added.add(translated);
-        });
-        this._removeHandle = this.register.onRemove.subscribe(v => {
-            const translated = translator.to(v);
-            if (this._added.includes(translated))
-                this._added.remove(translated);
-            else
-                this._removed.add(translated);
-        });
+    private changeReg() {
+        if (this._oldRegister === this.register) return;
+        this._addHandle?.unsubscribe();
+        this._removeHandle?.unsubscribe();
+
+        if (this.register) this._equator = (a: srcT, b: srcT) => this._register!.elementEquator(this.translator.from(a), this.translator.from(b));
+        else this._equator = undefined;
+
+        this._oldRegister?.forEach(this.remove.bind(this));
+        this._added.equator = this._equator ?? defaultEquator;
+        this._removed.equator = this._equator ?? defaultEquator;
+        this.register?.forEach(this.add.bind(this));
+
+        if (this.register) {
+            this._addHandle = this.register?.onAdd.subscribe(v => this.add(v));
+            this._removeHandle = this.register?.onRemove.subscribe(v => this.remove(v));
+        }
+
+        this._oldRegister = this._register.value;
+    }
+
+    constructor(private _register: registerProperty<T>, private translator: translator<T, srcT> = defaultTranslator) {
+        this._added = new register<srcT>();
+        this._removed = new register<srcT>();
+
+        this.changeReg();
+        _register.onChange.subscribe(v => this.changeReg());
     }
 }
 
@@ -213,23 +254,13 @@ export class registerChangeApplier<T, srcT = T> implements changeApplier<registe
 
     constructor(private obj: any, private name: string, private translator: translator<T, srcT>) { }
 }
-export function registerPropFactory<T>(value: register<T>, equator: equator<T>) {
+export function registerPropFactory<T>(value: register<T> | undefined, equator: equator<T>) {
     return new registerProperty(value, equator);
 }
-export function registerProp<T, srcT = T>(options: propOptionsSource<register<T>, T, srcT> = { isReadonly: true }): PropertyDecorator {
-    if (typeof options === 'object' && options.isReadonly === void 0) options.isReadonly = true;
+export function registerProp<T, srcT = T>(options: propOptions<register<T> | undefined, T, srcT> = { isReadonly: true }): PropertyDecorator {
+    if (options.isReadonly === void 0) options.isReadonly = true;
 
-    if (options instanceof Function)  {
-        let oldOptions = options;
-        options = v => {
-            let res = oldOptions(v);
-            if (res.isReadonly === void 0) res.isReadonly = true;
-
-            return res;
-        };
-    }
-
-    return (target, key) => prop<register<T>, registerChangeDescriptor<srcT>, T, srcT>({
+    return (target, key) => prop<register<T> | undefined, registerChangeDescriptor<srcT>, T, srcT>({
         changeApplierFactory: registerChangeApplier.factory(key.toString()),
         changeTrackerFactory: registerChangeTracker.factory<T, srcT>(),
         propFactory: registerPropFactory,

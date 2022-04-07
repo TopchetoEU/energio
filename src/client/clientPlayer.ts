@@ -1,17 +1,18 @@
+import { freeFunc } from "../common/gameObject";
 import { laserAttribs } from "../common/laser";
-import { point } from "../common/packets";
-import { planet } from "../common/planet";
 import { player } from "../common/player";
 import { appliableObject, objectChangeApplier, objectChangeDescriptor } from "../common/props/changes";
-import { afterConstructor, appliable, constructorExtender, propOwner } from "../common/props/decorators";
+import { appliable } from "../common/props/decorators";
 import { ExtMath, vector } from "../common/vector";
 import { clientController, drawImage } from "./clientController";
 import { transformStack } from "./transformStack";
 
-@constructorExtender()
-@appliable()
-@propOwner()
+@appliable<clientPlayer>(function(packet: objectChangeDescriptor) {
+    this.applier.apply(packet);
+})
 export class clientPlayer extends player implements appliableObject {
+    public readonly location = vector.zero;
+    public readonly direction = 0;
     public readonly chatBubble!: string;
     public readonly production!: number;
     public readonly consumption!: number;
@@ -22,7 +23,7 @@ export class clientPlayer extends player implements appliableObject {
     public prevDirection: number;
 
     private get rocketImg(): string {
-        return 'player.png';
+        return 'player';
     }
 
     private async drawRocket(canvas: CanvasRenderingContext2D, stack: transformStack, rotation: number) {
@@ -68,15 +69,10 @@ export class clientPlayer extends player implements appliableObject {
         stack.end();
     }
 
-    public constructor(packet: objectChangeDescriptor) {
-        super(packet!.id, vector.fromPoint(packet!.location as point), packet!.direction);
+    public constructor(packet: objectChangeDescriptor, free?: freeFunc<clientPlayer>) {
+        super(packet!.id, free as freeFunc<player>);
 
         this.prevDirection = this.direction;
         this.prevLocation = this.location;
-    }
-
-    @afterConstructor()
-    private _afterConstr(packet: objectChangeDescriptor) {
-        this.applier.apply(packet);
     }
 }

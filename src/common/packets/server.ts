@@ -135,6 +135,18 @@ export interface kickPacketData {
     message?: string;
 }
 
+export interface assetData {
+    /**
+     * The type of the asset. This is the root of the assets folder,
+     * and this will determine the file extension
+     */
+    type: 'image' | 'sound';
+    /**
+     * The base filename of the asset, relative to /static/assets/type
+     */
+    name: string;
+}
+
 /**
  * A packet, sent by the server as a response to
  * a login request
@@ -144,6 +156,10 @@ export interface initPacketData {
      * The ID with which the client's player will be identified
      */
     selfId: string;
+    /**
+     * The assets that the client must load before starting
+     */
+    assets: assetData[];
 }
 
 

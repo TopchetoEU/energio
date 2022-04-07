@@ -1,1 +1,1 @@
-put your ip here, don't forget the ws:// in front of it
+localhost

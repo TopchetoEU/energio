@@ -1,4 +1,4 @@
-import { gameObject } from "../gameObject";
+import { gameObjectBase } from "../gameObject";
 import { objectChangeTracker, trackableObject } from "./changes";
 
 /**

@@ -6,9 +6,9 @@
             "y": 248
         },
         "diameter": 422,
-        "normalSrc": "planets/normal/planet-1.png",
-        "colonySrc": "planets/colony/planet-1.png",
-        "selectedSrc": "planets/selected/planet-1.png",
+        "normalSrc": "planets/normal/planet-1",
+        "colonySrc": "planets/colony/planet-1",
+        "selectedSrc": "planets/selected/planet-1",
         "limit": 0.420,
         "prodPerCapita": 100
     },
@@ -19,9 +19,9 @@
             "y": 208
         },
         "diameter": 211,
-        "normalSrc": "planets/normal/planet-2.png",
-        "colonySrc": "planets/colony/planet-2.png",
-        "selectedSrc": "planets/selected/planet-2.png",
+        "normalSrc": "planets/normal/planet-2",
+        "colonySrc": "planets/colony/planet-2",
+        "selectedSrc": "planets/selected/planet-2",
         "limit": 6.900,
         "prodPerCapita": 500
     },
@@ -32,9 +32,9 @@
             "y": 152
         },
         "diameter": 213,
-        "normalSrc": "planets/normal/planet-3.png",
-        "colonySrc": "planets/colony/planet-3.png",
-        "selectedSrc": "planets/selected/planet-3.png",
+        "normalSrc": "planets/normal/planet-3",
+        "colonySrc": "planets/colony/planet-3",
+        "selectedSrc": "planets/selected/planet-3",
         "limit": 0.350,
         "prodPerCapita": 5000
     },
@@ -45,9 +45,9 @@
             "y": 150
         },
         "diameter": 294,
-        "normalSrc": "planets/normal/planet-4.png",
-        "colonySrc": "planets/colony/planet-4.png",
-        "selectedSrc": "planets/selected/planet-4.png",
+        "normalSrc": "planets/normal/planet-4",
+        "colonySrc": "planets/colony/planet-4",
+        "selectedSrc": "planets/selected/planet-4",
         "limit": 10.000,
         "prodPerCapita": 2500
     },
@@ -58,9 +58,9 @@
             "y": 83
         },
         "diameter": 156,
-        "normalSrc": "planets/normal/planet-5.png",
-        "colonySrc": "planets/colony/planet-5.png",
-        "selectedSrc": "planets/selected/planet-5.png",
+        "normalSrc": "planets/normal/planet-5",
+        "colonySrc": "planets/colony/planet-5",
+        "selectedSrc": "planets/selected/planet-5",
         "limit": 2,
         "prodPerCapita": 20000
     },
@@ -71,9 +71,9 @@
             "y": 152
         },
         "diameter": 252,
-        "normalSrc": "planets/normal/planet-6.png",
-        "colonySrc": "planets/colony/planet-6.png",
-        "selectedSrc": "planets/selected/planet-6.png",
+        "normalSrc": "planets/normal/planet-6",
+        "colonySrc": "planets/colony/planet-6",
+        "selectedSrc": "planets/selected/planet-6",
         "limit": 0.690,
         "prodPerCapita": 800
     },
@@ -84,9 +84,9 @@
             "y": 81
         },
         "diameter": 153,
-        "normalSrc": "planets/normal/planet-7.png",
-        "colonySrc": "planets/colony/planet-7.png",
-        "selectedSrc": "planets/selected/planet-7.png",
+        "normalSrc": "planets/normal/planet-7",
+        "colonySrc": "planets/colony/planet-7",
+        "selectedSrc": "planets/selected/planet-7",
         "limit": 1.500,
         "prodPerCapita": 800
     },
@@ -97,9 +97,9 @@
             "y": 110
         },
         "diameter": 216,
-        "normalSrc": "planets/normal/planet-8.png",
-        "colonySrc": "planets/colony/planet-8.png",
-        "selectedSrc": "planets/selected/planet-8.png",
+        "normalSrc": "planets/normal/planet-8",
+        "colonySrc": "planets/colony/planet-8",
+        "selectedSrc": "planets/selected/planet-8",
         "limit": 15.000,
         "prodPerCapita": 1600
     }

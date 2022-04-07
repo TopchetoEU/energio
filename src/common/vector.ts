@@ -137,7 +137,7 @@ export class vector {
     }
 
     public  toDirection(inRadians: boolean = false): number {
-        let angle = Math.atan(this.normalized.y / this.normalized.x) + Math.PI / 2;
+        let angle = Math.atan2(this.normalized.y, this.normalized.x) + Math.PI / 2;
 
         if (!inRadians) angle = angle * 180 / Math.PI;
 

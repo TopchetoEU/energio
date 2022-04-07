@@ -2,7 +2,7 @@ import { map, merge, Observable, Subject, Subscribable } from "rxjs";
 import { AnyCatcher } from "rxjs/internal/AnyCatcher";
 import { ExtMath } from "../vector";
 import { appliable, changeApplier, changeApplierFactory, changeTracker, changeTrackerFactory, objectChangeApplier, propertyChangeApplier, propertyChangeDescriptor, propertyChangeTracker, trackable, trackableObject } from "./changes";
-import { prop, propOptions, propOptionsProvider, propOptionsSource } from "./decorators";
+import { prop, propOptions } from "./decorators";
 import { translator } from "./translator";
 
 export type equator<T> = (a: T, b: T) => boolean;
@@ -52,7 +52,7 @@ export class valueProperty<T> {
     }
 
     public get onChange(): Observable<T> {
-        return this._onChange;
+        return this._onChange.asObservable();
     }
 
     public constructor(initialValue: T, public readonly equator: equator<T> = defaultEquator, public readonly changeNotifier: Observable<any> = new Observable()) {
@@ -78,7 +78,7 @@ export function valueFactory<T>(defaultVal: T, equator: equator<T>, changeNotifi
     return new valueProperty(defaultVal, equator, changeNotifier);
 }
 
-export function valProp(options?: propOptionsSource<any, propertyChangeDescriptor<any>>, trackable?: boolean): PropertyDecorator {
+export function valProp(options?: propOptions<any, propertyChangeDescriptor<any>>, trackable?: boolean): PropertyDecorator {
     return (target: any, key) => {
         if (options === void 0) options = { } as propOptions<any, propertyChangeDescriptor<any>>;
 

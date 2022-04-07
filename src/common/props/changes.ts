@@ -1,4 +1,5 @@
 import { Subscription } from "rxjs";
+import { props } from "./decorators";
 import { property, valueProperty } from "./property";
 import { register } from "./register";
 import { defaultTranslator, translator, translators } from "./translator";
@@ -74,7 +75,7 @@ export class objectChangeApplier implements changeApplier<objectChangeDescriptor
         }
     }
 
-    public prop(name: string, target: any, changeApplierFactory?: changeApplierFactory<any, propertyChangeDescriptor<any>, any, any>, translator: translator<any, any> = defaultTranslator) {
+    public property(name: string, target: any, changeApplierFactory?: changeApplierFactory<any, propertyChangeDescriptor<any>, any, any>, translator: translator<any, any> = defaultTranslator) {
         if (this.props.has(name)) {
             throw new Error(`Property '${name}' is already in the apply list.`);
         }

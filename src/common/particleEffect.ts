@@ -1,5 +1,5 @@
-import { gameObject } from "./gameObject";
+import { gameObjectBase } from "./gameObject";
 
-export abstract class particleEffect extends gameObject {
+export abstract class particleEffect extends gameObjectBase {
 
 }

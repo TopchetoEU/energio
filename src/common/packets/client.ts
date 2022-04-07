@@ -68,3 +68,8 @@ export interface shipControlPacketData {
 export interface clientChatPacketData {
     message: string;
 }
+/**
+ * A packet, sent by the client when he has loaded all the mandatory assets
+ * This is sent so the server can know when to log in the player
+ */
+export type acknAssetsData = undefined;

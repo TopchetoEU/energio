@@ -7,6 +7,9 @@ export interface energyConsumer extends gameObject {
 }
 
 export interface energyProducer extends gameObject {
+    /**
+     * The amount of terawatts that the object produces
+     */
     readonly production: number;
 }
 

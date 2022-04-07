@@ -1,0 +1,123 @@
+[
+    {
+        "type": "image",
+        "name": "player"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/starter"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/starter"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/starter"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/planet-1"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/planet-1"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/planet-1"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/planet-2"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/planet-2"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/planet-2"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/planet-3"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/planet-3"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/planet-3"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/planet-4"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/planet-4"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/planet-4"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/planet-5"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/planet-5"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/planet-5"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/planet-6"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/planet-6"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/planet-6"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/planet-7"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/planet-7"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/planet-7"
+    },
+
+    {
+        "type": "image",
+        "name": "planets/normal/planet-8"
+    },
+    {
+        "type": "image",
+        "name": "planets/colony/planet-8"
+    },
+    {
+        "type": "image",
+        "name": "planets/selected/planet-8"
+    }
+]

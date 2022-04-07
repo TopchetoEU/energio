@@ -11,7 +11,7 @@ import { ExtMath, vector } from "../common/vector";
 import { serverPlanet } from "./serverPlanet";
 import { player, playersOwner } from "../common/player";
 import { planet, planetsOwner } from "../common/planet";
-import { endEffectPacketData, laserPacketData, planetUpdateData, playerUpdateData, serverChatPacketData, tickPacketData } from "../common/packets/server";
+import { endEffectPacketData, initPacketData, laserPacketData, planetUpdateData, playerUpdateData, serverChatPacketData, tickPacketData } from "../common/packets/server";
 import { register, registerChangeTracker, registerProperty } from "../common/props/register";
 import { constructorExtender } from "../common/props/decorators";
 import { NIL } from "uuid";
@@ -19,13 +19,13 @@ import { physicsEngine } from "./physics/physicsEngine";
 import { serverLaser } from "./serverLaser";
 import { laserFirer } from "./laserFirer";
 import { isEmpty } from "../common/props/changes";
-
+import { performance } from "perf_hooks";
 interface context {
     connection: ws.connection;
     player?: serverPlayer,
 }
 
-const TIMEOUT = 200000;
+const TIMEOUT = 2000;
 
 @constructorExtender()
 export class serverController implements playersOwner, planetsOwner {
@@ -130,7 +130,7 @@ export class serverController implements playersOwner, planetsOwner {
     }
     private onChat(player?: serverPlayer): (packet: clientChatPacketData) => void {
         return async packet => {
-            let message = packet.message.trim().substring(0, 128).toUpperCase();
+            let message = packet.message.trim().substring(0, 128);
 
             if (message === '') return;
 
@@ -138,7 +138,7 @@ export class serverController implements playersOwner, planetsOwner {
             this.chat.push(msg);
             if (player) {
                 player.chatBubble = message;
-                console.log(`[CHAT]: ${player.name.toUpperCase()}: ${message}`);
+                console.log(`[CHAT]: ${player.name}: ${message}`);
             }
             else console.log(`[CHAT]: ${message}`);
             this.syncChat(msg);
@@ -148,7 +148,7 @@ export class serverController implements playersOwner, planetsOwner {
         this.players.forEach(v => (v as serverPlayer).connection.sendPacket(packetCode.CHAT, msg));
     }
 
-    private genTick(player: serverPlayer): tickPacketData {
+    private genTick(player: serverPlayer, delta: number): tickPacketData {
         const planetsChange = this._planetsTracker.changeDescriptor;
         const playersChange = this._playersTracker.changeDescriptor;
         playersChange?.added?.map(v => (v as serverPlayer).tracker.initDescriptor).filter(v => v !== void 0);
@@ -160,9 +160,9 @@ export class serverController implements playersOwner, planetsOwner {
         this.players.forEach(player => playerUpdate[player.id] = (player as serverPlayer).tracker.changeDescriptor);
 
         let desc: tickPacketData = {
-            delta: this.delta,
-            newPlayers: playersChange?.added?.map(v => ({ ...(v as serverPlayer).tracker.initDescriptor, id: v.id })),
-            newPlanets: planetsChange?.added?.map(v => ({ ...(v as serverPlanet).tracker.initDescriptor, id: v.id })),
+            delta,
+            newPlayers: playersChange?.added?.map(v => ({ ...(v as serverPlayer).tracker.initDescriptor, id: v.id })).filter(v => v !== void 0),
+            newPlanets: planetsChange?.added?.map(v => ({ ...(v as serverPlanet).tracker.initDescriptor, id: v.id })).filter(v => v !== void 0),
             deletedPlayers: playersChange?.removed?.map(v => v.id),
             deletedPlanets: planetsChange?.removed?.map(v => v.id),
             selectedPlanetId: player.selectedPlanet?.id ?? NIL,
@@ -182,8 +182,12 @@ export class serverController implements playersOwner, planetsOwner {
         let desc: tickPacketData = {
             delta: this.delta,
             selectedPlanetId: player.selectedPlanet?.id ?? NIL,
-            newPlayers: playersChange.map(v => ({ ...(v as serverPlayer).tracker.initDescriptor, id: v.id })),
-            newPlanets: planetsChange.map(v => ({ ...(v as serverPlanet).tracker.initDescriptor, id: v.id })),
+            newPlayers: playersChange
+                .map(v => ({ ...(v as serverPlayer).tracker.initDescriptor, id: v.id }))
+                .filter(v => !this._playersTracker.added.find(el => el.id === v.id)),
+            newPlanets: planetsChange
+                .map(v => ({ ...(v as serverPlanet).tracker.initDescriptor, id: v.id }))
+                .filter(v => !this._planetsTracker.added.find(el => el.id === v.id)),
         };
     
         if (desc.newPlayers?.length === 0) desc.newPlayers = undefined;
@@ -206,23 +210,18 @@ export class serverController implements playersOwner, planetsOwner {
         });
     }
 
-    private async syncOne(player: serverPlayer) {
+    private async syncOne(player: serverPlayer, delta: number) {
         try {
-            await player.connection.sendPacket(packetCode.TICK, this.genTick(player));
+            await player.connection.sendPacket(packetCode.TICK, this.genTick(player, delta));
         }
-        catch {
+        catch(e: any) {
             console.log(`Couldn't send packet to ${player.name}.`);
         }
     }
-    private async init(player: serverPlayer) {
-        await player.connection.sendPacket(packetCode.INIT, { selfId: player.id });
-        await player.connection.sendPacket(packetCode.TICK, this.genInitTick(player));
-        this.chat.forEach(v => player.connection.sendPacket(packetCode.CHAT, v));
-    }
 
-    private async sync() {
+    private async sync(delta: number) {
         for (let v of this.players.array) {
-            await this.syncOne(v as serverPlayer);
+            await this.syncOne(v as serverPlayer, delta);
         }
         this._planetsTracker.reset();
         this._playersTracker.reset();
@@ -233,11 +232,8 @@ export class serverController implements playersOwner, planetsOwner {
 
     private async login(connection: packetConnection, name: string, location: vector, direction: number): Promise<serverPlayer> {
         if (this.players.find(v => v.name === name) !== void 0) throw Error("Already logged in.");
-        
-        const player = new serverPlayer(name, connection, location, direction);
-        this.players.add(player);
 
-        await this.init(player);
+        const player = new serverPlayer(name, connection, location, direction, v => this.players.remove(v as serverPlayer));
 
         this.onChat()({ message:  name + ' joined the game.' });
 
@@ -288,7 +284,18 @@ export class serverController implements playersOwner, planetsOwner {
         return loc;
     }
 
-    constructor(port: number, config: gameConfig, private delta: number) {
+    private prevTimeout?: any;
+    private lastTick: number = 0;
+
+    private nextTick(delta: number) {
+        if (this.prevTimeout !== void 0) clearTimeout(this.prevTimeout);
+        this.update();
+        this.sync(delta).then(() => {
+            this.prevTimeout = setTimeout(v => this.nextTick(delta), delta * 1000);
+        });
+    }
+
+    constructor(port: number, private config: gameConfig, private delta: number) {
         this.httpServer = http.createServer();
         this.wsServer = new ws.server({
             httpServer: this.httpServer
@@ -337,6 +344,18 @@ export class serverController implements playersOwner, planetsOwner {
                     planet.population = planet.limit;
                     planet.owner = player;
 
+                    await player.connection.sendPacket(packetCode.INIT, {
+                        selfId: player.id,
+                        assets: this.config.assets
+                    } as initPacketData);
+                    let oldTimeout = player.connection.timeout;
+                    player.connection.timeout = 100000;
+                    await player.connection.oncePacket(packetCode.ACKNASSETS);
+                    player.connection.timeout = oldTimeout;
+                    this.players.add(player);
+                    await player.connection.sendPacket(packetCode.TICK, this.genInitTick(player));
+                    this.chat.forEach(v => player.connection.sendPacket(packetCode.CHAT, v));
+
                     socket.onClose.pipe(first()).subscribe(() => this.logout(player as serverPlayer));
                     con.onPacket<logoffPacketData>(packetCode.LOGOFF).subscribe(v => this.onLogoff(player)(v.data));
                     con.onPacket<controlPacketData>(packetCode.CONTROL).subscribe(v => this.onControl(player)(v.data));
@@ -345,17 +364,13 @@ export class serverController implements playersOwner, planetsOwner {
                 }
             }
             catch (e: any) {
-                console.log(e);
                 con.sendError(e.message ?? 'Generic error.', e.description);
                 con.connection.close();
+                
                 console.log("User failed to provide correct packets.");
             }
         });
 
-        setInterval(() => {
-            this.update();
-            this.sync();
-        }, this.delta * 1000);
-
+        this.nextTick(0.1);
     }
 }

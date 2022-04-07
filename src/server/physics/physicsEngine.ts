@@ -122,7 +122,6 @@ export class physicsEngine {
     }
 
     private updateController(delta: number, controller: physicsController) {
-        // if (controller instanceof serverLaser) console.log(controller.le);
         if (controller.velocity.lengthSquared < EPSILON) controller.velocity = vector.zero;
         else this.move(controller.velocity, this.step, controller.velocity.length * delta, controller);
 

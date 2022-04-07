@@ -3,17 +3,15 @@ import { vector, EPSILON, ExtMath } from "../common/vector";
 import { packet, packetConnection } from "../common/packetConnection";
 import { serverPlanet } from "./serverPlanet";
 import { energyConsumer, energyUnit } from "../common/energy";
-import { planet } from "../common/planet";
-import { Observable, Subscription } from "rxjs";
+import { Observable } from "rxjs";
 import { objectChangeTracker, trackableObject } from "../common/props/changes";
 import { getNextObjId } from "./server";
 import { register } from "../common/props/register";
-import { afterConstructor, constructorExtender, propOwner, trackable } from "../common/props/decorators";
-import { gameObject, gameObjectManager } from "../common/gameObject";
+import { trackable } from "../common/props/decorators";
+import { freeFunc, gameObjectBase, gameObjectManager } from "../common/gameObject";
 import { physicsController } from "./physics/physicsController";
 import { hitbox } from "./physics/hitbox";
-import { hitboxOwner } from "./physics/hitboxOwner";
-import { laser, laserAttribs } from "../common/laser";
+import { laserAttribs } from "../common/laser";
 import { laserFirer } from "./laserFirer";
 import { serverLaser } from "./serverLaser";
 
@@ -30,7 +28,7 @@ export enum rotationDirection {
 
 export type packetHandle<T> = (player: serverPlayer, packet: packet<T>) => void;
 
-class basicConsumer extends gameObject implements energyConsumer {
+class basicConsumer extends gameObjectBase implements energyConsumer {
     public readonly optionalConsumer = true;
     public active: boolean = false;
 
@@ -43,10 +41,10 @@ class basicConsumer extends gameObject implements energyConsumer {
     }
 }
 
-@constructorExtender()
 @trackable()
-@propOwner()
 export class serverPlayer extends player implements energyUnit, trackableObject, physicsController, laserFirer {
+    public location: vector;
+    public direction: number;
     public production: number = 0;
     public consumption: number = 0;
     public chatBubble: string = '';
@@ -82,15 +80,8 @@ export class serverPlayer extends player implements energyUnit, trackableObject,
 
     public rotationDirection: rotationDirection = rotationDirection.NONE;
 
-    private _subscribers: { [planet: number]: Subscription } = {};
-
     public velocity: vector = vector.zero;
     public angularVelocity: number = 0;
-
-    // public onCollision(other: hitboxOwner) {
-    //     console.log(`I hit ${other}`);
-    // }
-
 
     private updateStats() {
         this.production = this.ownedPlanets.reduce((prev, curr) => prev + curr.production, 0);
@@ -168,13 +159,19 @@ export class serverPlayer extends player implements energyUnit, trackableObject,
         });
     }
 
+    public override remove(): void {
+        this.connection.close(true);
+    }
+
     chatTimeout = 0;
 
-    public constructor(name: string, connection: packetConnection, location?: vector, direction?: number) {
-        super(getNextObjId(), location, direction);
+    public constructor(name: string, connection: packetConnection, location: vector, direction: number, free?: freeFunc<serverPlayer>) {
+        super(getNextObjId(), free as freeFunc<player>);
         
         this.connection = connection;
         this.name = name;
+        this.location = location;
+        this.direction = direction;
 
         this.shootingConsumer = new basicConsumer(this.laserAttribs.power * this.laserAttribs.frequency);
 
@@ -188,16 +185,13 @@ export class serverPlayer extends player implements energyUnit, trackableObject,
         this.consumers.add(this.movingConsumer);
         this.consumers.add(this.shootingConsumer);
 
+        this.chatBubbleChanged.subscribe(v => {
+            this.chatTimeout = 2;
+        });
+
         // this.movingChanged.subscribe(v => {
             // this.actuallyWalking = this.consumption + 1 < this.production;
             // this.updateStats(planetsOwner.planets);
         // });
-    }
-
-    @afterConstructor()
-    private _afterConstr() {
-        this.chatBubbleChanged.subscribe(v => {
-            this.chatTimeout = 2;
-        });
     }
 }

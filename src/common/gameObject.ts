@@ -3,20 +3,29 @@ import { abstractConstructor, paramProp } from "./props/decorators";
 import { valProp } from "./props/property";
 import { register } from "./props/register";
 
-let objects = new register<gameObject>();
+let objects = new Map<string, gameObjectBase>();
 
-export class gameObject {
+export type freeFunc<T> = (val: T) => void;
+
+export interface gameObject {
+    readonly id: string;
+    remove(): void;
+}
+
+export class gameObjectBase implements gameObject {
     public constructor(
-        @paramProp(valProp({ isTracked: true })) public readonly id: string
+        @paramProp(valProp({ isTracked: true })) public readonly id: string,
+        private readonly free?: freeFunc<gameObject>
     ) {
         if (gameObjectManager.includes(id)) {
             throw new Error("Object with same ID already exists.");
         }
-        objects.add(this);
+        objects.set(id, this);
     }
 
     public remove() {
-        objects.remove(this);
+        if (this.free) this.free(this);
+        objects.delete(this.id);
     }
 
     public toString() {
@@ -25,30 +34,29 @@ export class gameObject {
 }
 
 export const gameObjectManager = Object.freeze({
-    includes(id: string | gameObject): boolean {
-        if (typeof id !== 'string') return objects.includes(id);
+    includes(id: string | gameObjectBase): boolean {
+        if (typeof id !== 'string') return objects.has(id.id);
 
         if (id === NIL) return false;
-        return objects.filter(v => v.id === id).length > 0;
+        return objects.has(id);
     },
-    get(id: string | gameObject): gameObject {
-        return this.getTyped(id, gameObject);
+    get(id: string | gameObjectBase): gameObjectBase {
+        return this.getTyped(id, gameObjectBase);
     },
-    getTyped<T extends gameObject>(id: string | gameObject, type?: abstractConstructor<T>): T {
+    getTyped<T extends gameObjectBase>(id: string | gameObjectBase, type?: abstractConstructor<T>): T {
         if (typeof id !== 'string') return this.getTyped(id.id, type);
 
-        let objs = objects.filter(v => v.id === id);
+        let obj = objects.get(id);
 
         if (id === NIL) throw new Error("A NIL id was given.");
-        if (objs.length === 0) throw new Error(`A game object with the id ${id} doesn't exist.`);
+        if (!obj) throw new Error(`A game object with the id ${id} doesn't exist.`);
     
-        let obj = objs[0];
         if (type !== void 0 && !(obj instanceof type))
             throw new Error(`The game object with id ${id} exists, but is not a ${type.name}.`);
 
         return obj as T;
     },
-    getMaybe(id: string | gameObject): gameObject | undefined {
+    getMaybe(id: string | gameObjectBase): gameObjectBase | undefined {
         try {
             return this.get(id);
         }
@@ -56,7 +64,7 @@ export const gameObjectManager = Object.freeze({
             return void 0;
         }
     },
-    getTypedMaybe<T extends gameObject>(id: string | gameObject, type?: abstractConstructor<T>): T | undefined {
+    getTypedMaybe<T extends gameObjectBase>(id: string | gameObjectBase, type?: abstractConstructor<T>): T | undefined {
         try {
             return this.getTyped(id, type);
         }
@@ -64,8 +72,8 @@ export const gameObjectManager = Object.freeze({
             return void 0;
         }
     },
-    getAll<T extends gameObject = gameObject>(type?: abstractConstructor<T>) {
-        if (type === void 0) return objects.array as T[];
-        else return objects.filter(v => v instanceof type) as T[];
+    getAll<T extends gameObjectBase = gameObjectBase>(type?: abstractConstructor<T>): T[] {
+        if (type === void 0) return Array.from(objects.values()) as T[];
+        else return this.getAll().filter(v => v instanceof type) as T[];
     }
 });

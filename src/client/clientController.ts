@@ -2,12 +2,12 @@ import { fromEvent, Subscription } from "rxjs";
 import { packetConnection } from "../common/packetConnection";
 import { packetCode } from "../common/packets";
 import { controlType, shipControlPacketData } from "../common/packets/client";
-import { effectPacketData, initPacketData, kickPacketData, serverChatPacketData, tickPacketData } from "../common/packets/server";
+import { assetData, effectPacketData, initPacketData, kickPacketData, serverChatPacketData, tickPacketData } from "../common/packets/server";
 import { player } from "../common/player";
 import { socket } from "../common/socket";
 import { ExtMath, vector } from "../common/vector";
 import { energyUnit } from "../common/energy";
-import { resources } from "./resources";
+import { assets } from "./assets";
 import { transformStack } from "./transformStack";
 import { planet } from "../common/planet";
 import { clientPlayer } from "./clientPlayer";
@@ -15,38 +15,43 @@ import { clientPlanet } from "./clientPlanet";
 import { register, registerProp } from "../common/props/register";
 import { translators } from "../common/props/translator";
 import { gameObjectManager } from "../common/gameObject";
-import { afterConstructor, appliable, constructorExtender, extendConstructor, propOwner } from "../common/props/decorators";
+import { appliable, constructorExtender } from "../common/props/decorators";
 import { appliableObject, objectChangeApplier } from "../common/props/changes";
 import { clientLaser } from "./clientLaser";
 import { laserAttribs } from "../common/laser";
-import { container } from "webpack";
 
 const TIMEOUT = 2000;
 const onKeydown = fromEvent<KeyboardEvent>(document, 'keydown');
 const onKeyup = fromEvent<KeyboardEvent>(document, 'keyup');
 const SCALE = 1;
 
-export async function drawImage(canvas: CanvasRenderingContext2D, src: string, centered = true) {
-    let a = await resources.getImage(src);
-    if (centered) canvas.drawImage(a, -a.width / 2, -a.height / 2);
-    else canvas.drawImage(a, 0, -0);
+export function drawImage(canvas: CanvasRenderingContext2D, src: string, centered = true) {
+    let a = assets.get(src, 'image')?.data;
+    if (a) {
+        if (centered) canvas.drawImage(a, -a.width / 2, -a.height / 2);
+        else canvas.drawImage(a, 0, -0);
+    }
 }
 
-@constructorExtender<clientController>()
+/**
+ * An object, representing the player, playing the game. It does the communication between the client and the server
+ */
+// @constructorExtender<clientController>()
 @appliable()
-@propOwner()
 export class clientController extends player implements energyUnit, appliableObject {
-    public readonly production!: number;
-    public readonly chatBubble!: string;
-    public readonly consumption!: number;
+    public readonly location = vector.zero;
+    public readonly direction = 0;
+    public readonly production = 0;
+    public readonly chatBubble = '';
+    public readonly consumption = 0;
     public readonly laserAttribs!: laserAttribs;
     public readonly name: string;
     public readonly applier = new objectChangeApplier(this);
-    @registerProp((_this: clientController) => ({
+    @registerProp({
         translator: translators<player, string>()
-            .from(v => gameObjectManager.get(v) as clientPlayer)
+            .from(v => gameObjectManager.getTyped(v, clientPlayer))
             .to(v => v.id)
-    }))
+    })
     public readonly players = new register<clientPlayer | clientController>((a, b) => a.id === b.id);
     public readonly planets = new register<clientPlanet>((a, b) => a.id === b.id);
     public readonly lasers = new register<clientLaser>((a, b) => a.id === b.id);
@@ -67,7 +72,6 @@ export class clientController extends player implements energyUnit, appliableObj
     private leavePeopleBtnElement = document.getElementById('leavepeoplebtn') as HTMLButtonElement;
 
     public readonly connection: packetConnection;
-    private _subscribers: Subscription[] = [];
     private _delta: number = 0;
     public prevLocation: vector;
     public prevDirection: number;
@@ -83,12 +87,17 @@ export class clientController extends player implements energyUnit, appliableObj
         if (data.deletedPlanets !== void 0) this.planets.removeIf(planet => data.deletedPlanets!.includes(planet.id));
         if (data.deletedPlayers !== void 0) this.players.removeIf(player => data.deletedPlayers!.includes(player.id));
 
-        if(data.newPlanets !== void 0) this.planets.add(...data.newPlanets.map(v => new clientPlanet(v)));
+        if(data.newPlanets !== void 0) this.planets.add(...data.newPlanets.map(v => new clientPlanet(v, v => this.players.removeIf(el => el.id === v.id))));
         if(data.newPlayers !== void 0) {
             this.players.add(...data.newPlayers.filter(v => v!.id !== this.id).map(v => new clientPlayer(v)));
             data.newPlayers.filter(v => v!.id === this.id).forEach(v => {
                 this.applier.apply(v);
             });
+        }
+
+        for (let player of this.players.array) {
+            player.prevLocation = player.location;
+            player.prevDirection = player.direction;
         }
 
         try {
@@ -100,8 +109,6 @@ export class clientController extends player implements energyUnit, appliableObj
                     let p = gameObjectManager.getTypedMaybe(id, player);
                     if (p instanceof clientPlayer || p instanceof clientController) {
                         let applier = p.applier;
-                        p.prevLocation = p.location;
-                        p.prevDirection = p.direction;
                         applier.apply(changeDesc);
                     }
                 }
@@ -120,6 +127,7 @@ export class clientController extends player implements energyUnit, appliableObj
         }
         catch {}
 
+
         this.updateInfoElement();
         this.updateBarElements();
         this.lastTickTime = performance.now();
@@ -129,14 +137,14 @@ export class clientController extends player implements energyUnit, appliableObj
     }
     private onEffect(data: effectPacketData): void {
         if (data.type === "laser") {
-            let laser = new clientLaser(data.id, vector.fromPoint(data.velocity), vector.fromPoint(data.location), data.size, data.decay, data.power);
+            let laser = new clientLaser(data.id,
+                vector.fromPoint(data.velocity), vector.fromPoint(data.location),
+                data.size, data.decay, data.power,
+                v => this.lasers.remove(v as clientLaser)
+            );
             this.lasers.add(laser);
 
-            let sub = laser.onDecay.subscribe(() => {
-                this.lasers.remove(laser);
-                laser.remove();
-                sub.unsubscribe();
-            });
+            laser.onDecay.subscribe(() => laser.remove());
         }
     }
     private onChat(data: serverChatPacketData) {
@@ -179,7 +187,7 @@ export class clientController extends player implements energyUnit, appliableObj
         stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
 
         // stack.translate(new vector(this._canvasElement.width / 2, this._canvasElement.height / 2));
-        await drawImage(canvas, 'player.png');
+        await drawImage(canvas, 'player');
 
         clientController.drawBubble(canvas, stack, 0, this.chatBubble);
 
@@ -316,6 +324,27 @@ export class clientController extends player implements energyUnit, appliableObj
         requestAnimationFrame(this.frame.bind(this));
     }
 
+    private static loadAssets(_assets: assetData[]) {
+        return new Promise<void>((resolve, reject) => {
+            const loadingEl = document.getElementById('loading')!;
+            const guiEl = document.getElementById('gui')!;
+            const loadingbarEl = document.getElementById('loadingbar')!;
+            loadingbarEl.style.width = "0%";
+            loadingEl.style.removeProperty('display');
+            assets.load(..._assets).subscribe({
+                next: v => {
+                    loadingbarEl.style.width =  100 * (v.i / _assets.length) + '%';
+                },
+                complete: () => {
+                    loadingEl.style.display = 'none';
+                    guiEl.style.removeProperty('display');
+                    resolve();
+                },
+                error: v => reject(v),
+            });
+        });
+    }
+
     /**
      * Creates a client controller from initPacketData
      * @param packet A packet that contains initialization data
@@ -323,23 +352,20 @@ export class clientController extends player implements energyUnit, appliableObj
      * @param name The name of the self player
      */
     public constructor(packet: initPacketData, connection: packetConnection, name: string) {
-        super(packet.selfId, new vector(0, 0));
-        
+        super(packet.selfId);
+
         this.players.add(this);
         this.connection = connection;
         this.name = name;
+
+        this.gameElement.style.removeProperty('display');
 
         this.connection.onPacket<tickPacketData>(packetCode.TICK).subscribe(v => this.onTick(v.data));
         this.connection.onPacket<kickPacketData>(packetCode.KICK).subscribe(v => this.onKick(v.data));
         this.connection.onPacket<effectPacketData>(packetCode.EFFECT).subscribe(v => this.onEffect(v.data));
         this.connection.onPacket<serverChatPacketData>(packetCode.CHAT).subscribe(v => this.onChat(v.data));
         this.connection.onPacket<effectPacketData>(packetCode.ENDEFFECT).subscribe(v => {
-            let laser = gameObjectManager.getTypedMaybe(v.data.id, clientLaser);
-
-            if (laser) {
-                this.lasers.remove(laser);
-                laser.remove();
-            }
+            gameObjectManager.getTypedMaybe(v.data.id, clientLaser)?.remove();
         });
 
         this.gameElement.onkeydown = kb => {
@@ -349,8 +375,8 @@ export class clientController extends player implements energyUnit, appliableObj
         
         this.lastTickTime = performance.now();
 
-        this.prevDirection = this.direction;
-        this.prevLocation = this.location;
+        this.prevDirection = 0;
+        this.prevLocation = vector.zero;
 
         this.leavePeopleBtnElement.onclick = () => {
             this.connection.sendPacket(packetCode.SHIPCONTROL, {
@@ -376,7 +402,6 @@ export class clientController extends player implements energyUnit, appliableObj
             }
         }
 
-
         requestAnimationFrame(this.frame.bind(this));
     }
 
@@ -398,7 +423,8 @@ export class clientController extends player implements energyUnit, appliableObj
             throw new Error(res.message + ": " + res.description);
         }
         else {
-
+            await this.loadAssets(res.data.assets);
+            await con.sendPacket(packetCode.ACKNASSETS, undefined);
             return new clientController(res.data, con, name);
         }
     }

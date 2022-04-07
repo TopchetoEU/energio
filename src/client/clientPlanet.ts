@@ -1,22 +1,23 @@
-import { point } from "../common/packets";
+import { freeFunc } from "../common/gameObject";
 import { planet } from "../common/planet";
-import { playersOwner } from "../common/player";
 import { appliableObject, objectChangeApplier, objectChangeDescriptor } from "../common/props/changes";
-import { afterConstructor, appliable, constructorExtender, propOwner } from "../common/props/decorators";
+import { appliable, constructorExtender } from "../common/props/decorators";
 import { vector } from "../common/vector";
 import { drawImage } from "./clientController";
 import { transformStack } from "./transformStack";
 @constructorExtender()
-@appliable()
-@propOwner()
+@appliable<clientPlanet>(function(packet: objectChangeDescriptor) {
+    this.applier.apply(packet);
+})
 export class clientPlanet extends planet implements appliableObject {
-    public readonly renderOffset!: vector;
-    public readonly productionPerCapita!: number;
-    public readonly limit!: number;
-    public readonly normalSrc!: string;
-    public readonly colonySrc!: string;
-    public readonly selectedSrc!: string;
-    public readonly name!: string;
+    public readonly location = vector.zero;
+    public readonly renderOffset = vector.zero;
+    public readonly productionPerCapita = 0;
+    public readonly limit = 0;
+    public readonly normalSrc = '';
+    public readonly colonySrc = '';
+    public readonly selectedSrc = '';
+    public readonly name = '';
 
     public readonly applier = new objectChangeApplier(this);
 
@@ -51,12 +52,7 @@ export class clientPlanet extends planet implements appliableObject {
         stack.end();
     }
 
-    constructor(packet: objectChangeDescriptor) {
-        super(packet!.id, vector.fromPoint(packet!.location as point));
-    }
-
-    @afterConstructor()
-    private _afterConstr(packet: objectChangeDescriptor) {
-        this.applier.apply(packet);
+    constructor(packet: objectChangeDescriptor, free?: freeFunc<clientPlanet>) {
+        super(packet!.id, free as freeFunc<planet>);
     }
 }

@@ -5,5 +5,5 @@ export interface socket {
     get onClose(): Observable<void>;
     get closed(): boolean;
     send(data: string): Promise<void>;
-    close(): void;
+    close(detachHandles?: boolean): void;
 }

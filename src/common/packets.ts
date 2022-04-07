@@ -15,4 +15,5 @@ export enum packetCode {
     EFFECT,
     ENDEFFECT,
     CHAT,
+    ACKNASSETS,
 }

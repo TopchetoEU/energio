@@ -27,7 +27,7 @@ let nextId = 0;
 export class packetConnection {
     private _socket: socket;
     private _subscription?: rx.Subscription;
-    private _timeout: number;
+    public timeout: number;
     private _subject: rx.Subject<response> = new rx.Subject();
 
     public get connection() {
@@ -67,7 +67,7 @@ export class packetConnection {
         return new Promise((resolve, reject) =>
             this.onAnyPacket<T>().pipe(
                 rx.first(),
-                rx.timeout(this._timeout),
+                rx.timeout(this.timeout),
             )
             .subscribe({
                 error: reject,
@@ -79,7 +79,7 @@ export class packetConnection {
         return new Promise((resolve, reject) =>
             this.onPacket<T>(...types).pipe(
                 rx.first(),
-                rx.timeout(this._timeout),
+                rx.timeout(this.timeout),
             )
             .subscribe({
                 error: reject,
@@ -106,7 +106,7 @@ export class packetConnection {
                 }),
                 rx.first(),
                 rx.map(() => undefined),
-                rx.timeout(this._timeout),
+                rx.timeout(this.timeout),
                 rx.share(),
             ).subscribe({
                 next: resolve,
@@ -165,8 +165,8 @@ export class packetConnection {
 
     // private processedIds: number[] = [];
 
-    public constructor(connection: socket, timeout: number = 100000) {
-        this._timeout = timeout;
+    public constructor(connection: socket, timeout: number = 2000) {
+        this.timeout = timeout;
         this._socket = connection;
 
         this._socket.onMessage.subscribe(async msg => {

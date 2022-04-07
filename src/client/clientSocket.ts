@@ -19,9 +19,15 @@ export class clientSocket implements socket {
         this.ws.send(data);
         return Promise.resolve();
     }
-    close(): void {
+    close(detachHandles?: boolean): void {
         if (this.ws.readyState === WebSocket.CLOSED) return;
         this.ws.close();
+        if (detachHandles) {
+            this._subject.complete();
+            this._closeSubject.complete();
+            this._closeSubject = new Subject();
+            this._subject = new Subject();
+        }
     }
 
     public constructor(socket: WebSocket) {

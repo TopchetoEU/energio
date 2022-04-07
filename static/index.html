@@ -8,25 +8,41 @@
 </head>
     <script src="js/bundle.js" defer></script>
     <link rel="stylesheet" href="css/style.css">
-<body>
-    <!-- <div class="game"> -->
+<body style="display: none;">
+    <div id="modal" class="overlay" tabindex="-1">
+        <div id="form" class="modal">
+            <div class="form">
+                <h1>Energ.io</h1>
+                <h3>Input a username and play!</h3>
+                <input type="text" id="username" spellcheck="false">
+                <button id="playbtn">Play</button>
+            </div>
+        </div>
+        <div id="loading" class="modal">
+            <div class="loading">
+                <h2>Loading assets...</h2>
+                <div class="loading-bar-container">
+                    <div id="loadingbar" class="energy-bar" style="transition-duration: 50ms;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
     <canvas id="game" class="game" tabindex="0">
         Your browser isn't supported :(
     </canvas>
-    <!-- </div> -->
-    <div id="gui" tabindex="-1">
-        <div class="energyContainer">
-            <div class="energyInfo">
+    <div id="gui" class="overlay gui" tabindex="-1">
+        <div class="energy-container">
+            <div class="energy-info">
                 <span>Energy</span>
                 <span id="engpercent">0%</span>
             </div>
-            <div class="energyFullBar">
-                <div id="energybar"></div>
+            <div class="energy-bar-container">
+                <div class="energy-bar" id="energybar"></div>
             </div>
         </div>
-        <div class="planetInfo" id="planetinfo">
+        <div class="info" id="planetinfo">
             <h2>Planet info:</h2>
-            <div class="infoGrid" id="planetprops">
+            <div class="info-grid" id="planetprops">
             </div>
             <input placeholder="Count (in millions)" type="number" id="peoplecount" tabindex="2">
             <div id="planetPeople" class="field">
@@ -34,9 +50,9 @@
                 <button id="leavepeoplebtn">Leave</button>
             </div>
         </div>
-        <div class="playerInfo" id="playerinfo">
+        <div class="info" id="playerinfo">
             <h2>Player info:</h2>
-            <div class="infoGrid" id="playerprops">
+            <div class="info-grid" id="playerprops">
             </div>
         </div>
         <div class="chat">
@@ -45,14 +61,6 @@
                 </div>
             </div>
             <input type="text" tabindex="1" id="chatinput"> 
-        </div>
-    </div>
-    <div id="modal" class="overlay">
-        <div id="form" class="form">
-            <h1>Energ.io</h1>
-            <h3>Input a username and play!</h3>
-            <input type="text" id="username" spellcheck="false">
-            <button id="playbtn">Play</button>
         </div>
     </div>
 </body>

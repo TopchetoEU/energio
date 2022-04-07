@@ -1,81 +1,3 @@
-.energyContainer {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding-bottom: 10px;
-}
-.energyInfo {
-    width: max-content;
-    max-width: 33%;
-}
-.energyFullBar {
-    background-color: #967d0072;
-    width: 33%;
-    backdrop-filter: blur(10px);
-    height: 20px;
-}
-#energybar {
-    background-color: rgb(255, 236, 95);
-    height: 100%;
-    box-shadow: 0 0 20px 5px rgba(250, 210, 48, 0.871);
-    transition: 150ms linear;
-}
-
-.playerInfo, .planetInfo {
-    position: fixed;
-    width: max-content;
-    max-width: 33%;
-    height: max-content;
-    max-height: 500px;
-    padding: 20px;
-    background-color: #8882;
-    backdrop-filter: blur(10px);
-    display: block;
-    box-sizing: border-box;
-    font-size: .75em;
-}
-.playerInfo {
-    width: 600px;
-    height: 300px;
-    top: 0;
-    right: 0;
-}
-.planetInfo {
-    input {
-        width: 100%;
-    }
-    bottom: 0;
-    right: 0;
-}
-.field {
-    display: flex;
-    margin: 5px 0;
-    gap: 10px;
-    justify-content: space-evenly;
-}
-.field input {
-    margin: 0;
-    flex: 1 1 auto;
-}
-.field button {
-    width: 150px;
-}
-
-h2 {
-    text-align: center;
-}
-
-.infoGrid {
-    margin: 20px 0;
-    display: grid;
-    grid-template-columns: max-content auto;
-    gap: 10px;
-}
-
 @import 'common.scss';
 
 .game {
@@ -89,19 +11,27 @@ h2 {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    & > * {
+        position: fixed;
+        width: 100vw;
+        height: 100vh;
+    }
+    z-index: 10000;
 }
 
-#modal {
-    backdrop-filter: blur(10px);
+.energy-bar {
+    background-color: rgb(255, 236, 95);
+    height: 100%;
+    box-shadow: 0 0 20px 5px rgba(250, 210, 48, 0.871);
+    transition: 50ms linear;
+}
+
+.modal {
     display: flex;
     justify-content: center;
     align-items: center;
-    & > * {
-        display: block;
-        background-color: #3338;
-    }
+    backdrop-filter: blur(10px);
+
     .form {
         padding: 1rem 2rem;
 
@@ -122,14 +52,31 @@ h2 {
             width: 33%;
         }
     }
+    .loading {
+        padding: 2rem;
+        box-sizing: border-box;
+        min-width: min(100%, 800px);
+        width: 50%;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        align-items: center;
+
+        .loading-bar-container {
+            height: 1.5rem;
+            width: 100%;
+        }
+    }
 }
-#gui {
-    position: fixed;
-    top: 0;
-    left: 0;
+.gui {
+    width: 0;
+    height: 0;
     & > * {
+        width: unset;
+        height: unset;
         position: fixed;
     }
+
     .chat {
         height: 10em;
         width: 300px;
@@ -155,5 +102,80 @@ h2 {
             font-size: .8em;
         }
         // .messages::scroll
+    }
+    .energy-container {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding-bottom: 10px;
+
+        .energy-info {
+            width: max-content;
+            max-width: 33%;
+        }
+
+        .energy-bar-container {
+            background-color: #967d0072;
+            width: 33%;
+            backdrop-filter: blur(10px);
+            height: 20px;
+        }
+    }
+
+    .info {
+        h2 {
+            text-align: center;
+        }
+
+        position: fixed;
+        width: max-content;
+        max-width: 33%;
+        height: max-content;
+        max-height: 500px;
+        padding: 20px;
+        background-color: #8882;
+        backdrop-filter: blur(10px);
+        display: block;
+        box-sizing: border-box;
+        font-size: .75em;
+    
+        .info-grid {
+            margin: 20px 0;
+            display: grid;
+            grid-template-columns: auto auto;
+            gap: 10px;
+        }
+    }
+
+    #playerinfo {
+        top: 0;
+        right: 0;
+    }
+    #planetinfo {
+        bottom: 0;
+        right: 0;
+
+        input {
+            width: 100%;
+        }
+
+        .field {
+            display: flex;
+            margin: 5px 0;
+            gap: 10px;
+            justify-content: space-evenly;
+
+            input {
+                margin: 0;
+                flex: 1 1 auto;
+            }
+            button {
+                width: 150px;
+            }
+        }
     }
 }

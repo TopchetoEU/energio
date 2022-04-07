@@ -25,13 +25,10 @@ export function extendConstructor<T>(constr: constructor<T>, ...extensions: Arra
     return extention as any;
 }
 
-export type propOptionsProvider<T, valT = T, srcT = valT> = (obj: any) => propOptions<T, valT, srcT>;
-export type propOptionsSource<T, valT = T, srcT = valT> = propOptionsProvider<T, valT, srcT> | propOptions<T, valT, srcT>;
-
 /**
  * Options, used for the prop() decorator
  */
-export interface propOptions<T, valT = T, srcT = valT> {
+export interface propOptions<T = any, valT = T, srcT = valT> {
     /**
      * The equator used by the property
      */
@@ -59,7 +56,7 @@ export interface propOptions<T, valT = T, srcT = valT> {
     //  */
     // isTrackable?: boolean;
 }
-export interface propFactories<T, descT, valT = T, srcT = valT>  {
+export interface propFactories<T = any, descT = any, valT = T, srcT = valT>  {
     /**
      * A factory for trackers, that will be used to generate the change descriptor for the property
      */
@@ -72,134 +69,100 @@ export interface propFactories<T, descT, valT = T, srcT = valT>  {
 }
 
 interface propertyMetadata {
-    factories?: propFactories<any, any>;
-    options?: propOptions<any>;
-    optionsProvider?: propOptionsProvider<any>;
+    factories: propFactories<any, any>;
+    options: propOptions<any>;
 }
 
-function getProp(target: any, name: string): propertyMetadata {
-    let props = getProps(target);
-    if (props[name] === void 0) props[name] = {  };
-
-    return props[name];
+function createPropMeta(target: any, name: string, factories: propFactories, options: propOptions) {
+    getPropsMeta(target)[name] = { factories, options };
 }
-function getProps(target: any): { [name: string]: propertyMetadata } {
-    let props = Reflect.getMetadata('properties', target);
-    if (props === void 0) Reflect.defineMetadata('properties', props = {}, target);
+function getProp(target: any, name: string): property<any> {
+    let meta = getPropMeta(target.constructor.prototype, name);
+    if (meta === void 0) throw new Error(`Property meta for ${name} is not defined.`);
+
+    if (!Reflect.hasMetadata('props:property', target, name)) {
+        let res = meta.factories.propFactory(undefined,
+            meta.options.equator ?? defaultEquator,
+            meta.options.changeNotifier ?? new Observable()
+        );
+
+        Reflect.defineMetadata('props:property', res, target, name)
+        return res;
+    }
+    else return Reflect.getMetadata('props:property', target, name);
+}
+function getPropMeta(target: any, name: string): propertyMetadata | undefined {
+    return getPropsMeta(target)[name];
+}
+function getPropsMeta(target: any): { [name: string]: propertyMetadata } {
+    let props = Reflect.getOwnMetadata('props:properties', target);
+    if (props === void 0) {
+        let inherited = Reflect.getMetadata('props:properties', target);
+        if (inherited === void 0) inherited = {};
+        Reflect.defineMetadata('props:properties', props = {...inherited}, target);
+    }
 
     return props;
 }
 
-export function prop<T, descT, valT = T, srcT = valT>(factories: propFactories<T, descT, valT, srcT>, options: propOptionsSource<any, propertyChangeDescriptor<any>>) {
-    let optionsProvider!: propOptionsProvider<any, propertyChangeDescriptor<any>>;
+export function prop<T, descT, valT = T, srcT = valT>(factories: propFactories<T, descT, valT, srcT>, options: propOptions<any, propertyChangeDescriptor<any>>) {
+    return (target: Object, key: string) => {
+        createPropMeta(target, key, factories, options);
 
-    switch (typeof options) {
-        case 'undefined':
-            optionsProvider = () => ({ });
-            break;
-        case 'function':
-            optionsProvider = options;
-            break;
-        default:
-            optionsProvider = () => options;
-    }
+        if (Object.getOwnPropertyDescriptor(target, key))
+            throw new Error(`A property accessor for ${key} in ${target} already exists.`);
 
-    return (target: any, key: string) => {
-        getProps(target)[key] = { factories, optionsProvider };
-        let keys = [];
-        for (let prop in getProps(target)) {
-            keys.push(prop);
-        }
-    };
-}
-
-export function propOwner() {
-    return (target: constructor<any>): any => {
-        return extendConstructor(target, function() {
-            let props = getProps(target.prototype);
-
-            for (let name in props) {
-                let propDescription = props[name];
-
-                if (propDescription.factories === void 0 || propDescription.optionsProvider === void 0)
-                    throw new Error(`Property ${name} is not fully defined. Maybe you forgot a @param() decorator.`);
-
-                propDescription.options = propDescription.optionsProvider(this);
-
-                let prop = propDescription.factories.propFactory(
-                    (this as any)[name],
-                    propDescription.options.equator ?? defaultEquator,
-                    propDescription.options.changeNotifier ?? new Observable()
-                );
-
-                Reflect.defineMetadata('property', prop, this, name);
-
-                if (propDescription.options.isReadonly) {
-                    Object.defineProperty(this, name, {
-                        get: () => prop.value,
-                        set: () => { throw new Error("You're trying to set a readonly property.") },
-                        configurable: false,
-                        enumerable: true,
-                    });
-                }
-                else {
-                    Object.defineProperty(this, name, {
-                        get: () => prop.value,
-                        set: val => prop.value = val,
-                        configurable: false,
-                        enumerable: true,
-                    });
-                }
-
-                Object.defineProperty(this, name + 'Changed', {
-                    get: () => prop.onChange,
-                    configurable: false,
-                    enumerable: true,
-                });
-            }
+        Object.defineProperty(target, key, {
+            get(this: any) {
+                return getProp(this, key).value;
+            },
+            set(this: any, val) {
+                getProp(this, key).value = val;
+            },
+            configurable: false,
+            enumerable: true,
+        });
+        Object.defineProperty(target, key + 'Changed', {
+            get(this: any) {
+                return getProp(this, key).onChange;
+            },
+            configurable: false,
+            enumerable: true,
         });
     };
 }
-export function trackable() {
-    return (target: constructor<trackableObject>, key?: string): any => {
-        return extendConstructor(target, function() {
-            let props = getProps(this)
+
+export function trackable<T extends trackableObject>(...constr: Array<(this: T, ...args: any[]) => void>) {
+    return (target: constructor<T>): any => {
+        return extendConstructor(target, function(...args: any[]) {
+            let props = getPropsMeta(this);
 
             for (let name in props) {
-                let propDesc = props[name];
-                if (!propDesc.options?.isTracked) continue;
-
-                if (propDesc.factories === void 0 || propDesc.options === void 0)
-                    throw new Error("A @property() decorator must be used on @tracked() properties.");
-
-                let prop = Reflect.getMetadata('property', this, name) as property<any> | undefined;
-                if (prop === void 0) 
-                    throw new Error(`Property ${name} hasn't been defined yet. Note that @trackable() should be ran after @propOwner().`);
-
-                this.tracker.property(name, prop, propDesc.factories.changeTrackerFactory, propDesc.options.translator);
+                let propMeta = props[name];
+                let prop = getProp(this, name);
+                if (!propMeta.options.isTracked) continue;
+                this.tracker.property(name, prop, propMeta.factories.changeTrackerFactory, propMeta.options.translator);
             }
+
+            this.tracker.reset();
+
+            constr.forEach(element => element.call(this, ...args));
         });
     };
 }
-export function appliable() {
-    return (target: constructor<appliableObject>): any => {
-        return extendConstructor(target, function() {
-            let props = getProps(this)
+export function appliable<T extends appliableObject>(...constr: Array<(this: T, ...args: any[]) => void>) {
+    return (target: constructor<T>): any => {
+        return extendConstructor(target, function(...args: any[]) {
+            let props = getPropsMeta(this);
 
             for (let name in props) {
-                let propDesc = props[name];
-
-                if (propDesc.factories === void 0 || propDesc.options === void 0)
-                    throw new Error("A @property() decorator must be used on @tracked() properties.");
-
-                if (!propDesc.options.isTracked) continue;
-
-                let prop = Reflect.getMetadata('property', this, name) as property<any> | undefined;
-                if (prop === void 0) 
-                    throw new Error(`Property ${name} hasn't been defined yet. Note that @appliable() should be ran after @propOwner().`);
-
-                this.applier.prop(name, this, propDesc.factories.changeApplierFactory, propDesc.options.translator);
+                let propMeta = props[name];
+                let prop = getProp(this, name);
+                if (!propMeta.options.isTracked) continue;
+                this.applier.property(name, this, propMeta.factories.changeApplierFactory, propMeta.options.translator);
             }
+
+            constr.forEach(element => element.call(this, ...args));
         });
     };
 }
@@ -211,7 +174,7 @@ function getArgs(func: Function) {
 
 export function paramProp(decorator: PropertyDecorator) {
     return (target: any, key: string, index: number) => {
-        decorator(target.constructor, getArgs(target)[index]);
+        decorator(target.prototype, getArgs(target)[index]);
     }
 }
 
@@ -237,3 +200,21 @@ export function afterConstructor() {
         postconstr.push(target[key.toString()]);
     };
 }
+
+export const props = {
+    getAll(target: Function) {
+        return Object.keys(getPropsMeta(target.prototype)).map(v => getProp(target, v));
+    },
+    getNames(target: Function) {
+        return Object.keys(getPropsMeta(target.prototype));
+    },
+    getAllMeta(target: Function) {
+        return getPropsMeta(target.prototype);
+    },
+    get(target: Function, name: string) {
+        return getProp(target, name);
+    },
+    getMeta(target: Function, name: string) {
+        return getPropMeta(target.prototype, name);
+    },
+};

@@ -10,9 +10,7 @@ export class clientLaser extends laser {
     public draw(context: CanvasRenderingContext2D, stack: transformStack) {
         stack.begin();
         stack.translate(this.location);
-        stack.rotate(this.velocity.toDirection() - 180);
-
-        // context.globalCompositeOperation = "destination-over";
+        stack.rotate(this.velocity.toDirection());
 
         context.beginPath();
         context.rect(-this.size / 2, -this.size / 2, this.size, 100);

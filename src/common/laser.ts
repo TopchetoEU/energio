@@ -1,5 +1,5 @@
 import { Observable, Subject } from "rxjs";
-import { gameObject } from "./gameObject";
+import { freeFunc, gameObjectBase } from "./gameObject";
 import { point } from "./packets";
 import { vector } from "./vector";
 
@@ -19,7 +19,7 @@ export interface laserCreationData {
     readonly power: number;
 }
 
-export class laser extends gameObject {
+export class laser extends gameObjectBase {
     private _onDecay = new Subject<void>();
 
     private initLoc;
@@ -36,15 +36,20 @@ export class laser extends gameObject {
         }
     }
 
+    public override remove(): void {
+        this._onDecay.complete();
+    }
+
     public constructor(
         id: string,
         public velocity: vector,
         public location: vector,
         public readonly size: number,
         public readonly decay: number,
-        public power: number
+        public power: number,
+        free?: freeFunc<laser>
     ) {
-        super(id);
+        super(id, free as freeFunc<gameObjectBase>);
         this.initLoc = location;
     }
 }

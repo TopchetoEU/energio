@@ -3,17 +3,22 @@ import { ExtMath, vector } from "../common/vector";
 import { locatedPlanetConfig } from "./gameConfig";
 import { objectChangeTracker, trackableObject } from "../common/props/changes";
 import { getNextObjId } from "./server";
-import { afterConstructor, constructorExtender, propOwner, trackable } from "../common/props/decorators";
+import { trackable } from "../common/props/decorators";
 import { hitboxOwner } from "./physics/hitboxOwner";
 import { hitbox } from "./physics/hitbox";
 import { healthOwner } from "../common/healthOwner";
+import { freeFunc, gameObject } from "../common/gameObject";
 
 export const GROWTH_RATE = 0.005;
 
-@constructorExtender()
-@trackable()
-@propOwner()
+@trackable<serverPlanet>(function() {
+    this.populationChanged.subscribe(v => {
+        this.production = this.productionPerCapita * v / 1000;
+        if (v < 0.0001) this.owner = undefined;
+    });
+})
 export class serverPlanet extends planet implements trackableObject, hitboxOwner, healthOwner {
+    public location: vector;
     public readonly renderOffset: vector;
     public readonly productionPerCapita: number;
     public readonly limit: number;
@@ -46,9 +51,10 @@ export class serverPlanet extends planet implements trackableObject, hitboxOwner
         }
     }
 
-    constructor(config: locatedPlanetConfig) {
-        super(getNextObjId(), vector.fromPoint(config.location));
+    constructor(config: locatedPlanetConfig, free?: freeFunc<serverPlanet>) {
+        super(getNextObjId(), free as freeFunc<gameObject>);
 
+        this.location = vector.fromPoint(config.location);
         this.productionPerCapita = config.prodPerCapita;
         this.limit = config.limit;
         this.consumption = this.productionPerCapita * this.limit / 1000 / 3;
@@ -58,13 +64,5 @@ export class serverPlanet extends planet implements trackableObject, hitboxOwner
         this.name = config.name;
         this.renderOffset = vector.fromPoint(config.offset);
         this.hitbox = new hitbox(config.diameter);
-    }
-
-    @afterConstructor()
-    private _afterPropInit() {
-        this.populationChanged.subscribe(v => {
-            this.production = this.productionPerCapita * v / 1000;
-            if (v < 0.0001) this.owner = undefined;
-        });
     }
 }

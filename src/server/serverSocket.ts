@@ -21,9 +21,15 @@ export class serverSocket implements socket {
             });
         });
     }
-    public close(): void {
+    public close(detachHandles?: boolean): void {
         if (this._connection.closeReasonCode !== -1) return;
         this._connection.close();
+        if (detachHandles) {
+            this._subject.complete();
+            this._closeSubject.complete();
+            this._closeSubject = new Subject();
+            this._subject = new Subject();
+        }
     }
 
     constructor(connection: connection) {
@@ -31,9 +37,7 @@ export class serverSocket implements socket {
         if (this._connection.closeReasonCode === -1) {
             this._subject = new Subject();
             this._connection.on('message', (data) => {
-                    if (data.type === "binary") {
-                        this._connection.send("Binary is not supported :(");
-                    }
+                    if (data.type === "binary") this._subject.next(data.binaryData.toString("utf8"));
                     else this._subject.next(data.utf8Data);
                 }
             );

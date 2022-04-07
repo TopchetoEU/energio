@@ -1,18 +1,17 @@
 import { Observable } from "rxjs";
 import { NIL } from "uuid";
 import { energyUnit } from "./energy";
-import { gameObject, gameObjectManager } from "./gameObject";
+import { freeFunc, gameObject, gameObjectBase, gameObjectManager } from "./gameObject";
 import { player } from "./player";
-import { afterConstructor, constructorExtender, paramProp, propOwner } from "./props/decorators";
 import { valProp } from "./props/property";
 import { register } from "./props/register";
 import { translator, translators } from "./props/translator";
 import { playerTranslator } from "./translators";
 import { vector } from "./vector";
 
-export abstract class planet extends gameObject implements energyUnit {
+export abstract class planet extends gameObjectBase implements energyUnit {
 
-    @valProp({ isTracked: true, translator: vector.pointTranslator }) public readonly location: vector;
+    @valProp({ isTracked: true, translator: vector.pointTranslator }) public abstract readonly location: vector;
 
     @valProp({
         isTracked: true,
@@ -40,14 +39,9 @@ export abstract class planet extends gameObject implements energyUnit {
 
     public constructor(
         id: string,
-        initLocation: vector
+        free?: freeFunc<planet>
     ) {
-        super(id);
-        this.location = initLocation;
-    }
-
-    @afterConstructor()
-    private afterPropInit() {
+        super(id, free as freeFunc<gameObject>);
         let oldOwner: player | undefined = undefined;
 
         this.ownerChanged.subscribe(v => {
